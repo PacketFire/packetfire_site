@@ -2,3 +2,34 @@ baseURL = "http://packetfire.org"
 languageCode = "en-us"
 title = "Packetfire"
 theme = "packetfire"
+
+[params]
+    description = "A Virtual Hackerspace"
+    accent = "red"
+    showBorder = true
+    backgroundColor = "white"
+    font = "Raleway" # should match the name on Google Fonts!
+    highlight = true
+    highlightStyle = "solarized-dark"
+    highlightLanguages = ["go", "haskell", "kotlin", "scala", "swift"]
+    copyright = "&copy; All rights reserved by [Packetfire](http://packetfire.org/)"
+
+[[menu.main]]
+    url = "/"
+    name = "Home"
+    weight = 1
+
+[[menu.main]]
+    url = "/post/"
+    name = "Posts"
+    weight = 2
+
+[[menu.main]]
+    url = "/project/"
+    name = "Projects"
+    weight = 3
+
+[[menu.icon]]
+    url = "mailto:ncatelli@packetfire.org"
+    name = "envelope-o"
+    weight = 1
