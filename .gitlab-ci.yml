@@ -7,7 +7,7 @@ build:
     - apt-get install -y hugo rsync
     - hugo
     - echo $RSYNC_PASSWORD > /tmp/rsync_password
-    - rsync -arvzh --progress --password-file=/tmp/rsync_password public $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/
+    - "rsync -arvzh --progress --password-file=/tmp/rsync_password public/* $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/"
     - rm -rf /tmp/rsync_password
   only:
     - master
