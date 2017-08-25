@@ -9,3 +9,5 @@ build:
     - echo $RSYNC_PASSWORD > /tmp/rsync_password
     - rsync -arvzh --progres --pasword-file=/tm/rsync_password public $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/
     - rm -rf /tmp/rsync_password
+  only:
+    - master
