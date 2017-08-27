@@ -7,9 +7,9 @@ draft: false
 ---
 
 ### Introduction:
-BGP is one of the core technologies behind making our internet work, allowing networks to communicate their routes between eachother. Understanding how this tool can be used to define the topology of a network will both help you to better understand how internetworking works as well as translate this robustness into your own network. 
+Border Gateway Protocol (BGP) is one of the core technologies involved in making our internet work, allowing networks to communicate their routes among eachother. Understanding how this tool can be used to define the topology of a network will both give you a better understanding of how internetworking and allow you translate this robustness into your own network. 
 
-By the end of this tutorial I hope that you will be able to understand the core concepts of BGP along with the necessarily vocabulary to communicate this to another network engineer. I also hope to leave you with the abilty to use the open source tool, BIRD, to establish peering sessions and begin announcing routes.
+By the end of this tutorial, you will be familiar with the core concepts of BGP and have the proper vocabulary to communicate this to another network engineer. You will also be able to use a userland routing daemon, BIRD, to establish peering sessions and begin announcing routes.
 
 I plan to achieve this using a virtualized vagrant playground which can be downloaded [here](https://gitlab.packetfire.org/crunchbite/bird_examples.git). In order to complete this tutorial you will need to install vagrant 1.6+, git and rsync.
 
@@ -24,8 +24,7 @@ ncatelli@ofet> git submodule update
 ncatelli@ofet> vagrant up
 ```
 
-This should provide you with three VMs, peer1, peer2 and peer3, which already have BIRD installed and peering sessions established. Do not worry if you don't know what this means yet, we will go over that shortly now that we have our BGP playground setup and ready to go.
-
+This should create three VMs, peer1, peer2 and peer3, all of which have BIRD installed and have peering sessions established. Don't worry if you don't know what this means yet, we will cover it shortly after we have our BGP playground set up and ready to go.
 
 ### Login in to your playground:
 We will start by connecting to peer1 and checking that everything was setup correctly.
@@ -46,21 +45,21 @@ peer2    BGP      master   up     12:06:07    Established
 peer3    BGP      master   up     12:07:07    Established
 ```
 
-If, in fact, you see that peer2 and peer3 are "Established" then everything is working as expected and we are ready to go. Before we begin playing with this playground, I will start with a brief overview of how BGP works.
+If you see that peer2 and peer3 are "Established", everything is working as expected and we are ready to go. Before we begin playing with this playground, I will provide a brief overview of how BGP works.
 
 ### BGP Overview:
 #### Terminology:
-Border Gateway Protocol ([BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)) is an exterior gateway protocol that is used to exchange routing information between autonomous systems. An autonomous system ([AS](https://en.wikipedia.org/wiki/Autonomous_system_(Internet))) is an organization unit of routing prefixes and policies. These AS are identified by a unique 16-bit, and later 32-bit, autonomous system number (ASN). For example, Facebook's ASN would be 32934 or as commonly presented AS32934. The power of BGP is in communicating routing protocols and policies between AS.
+Border Gateway Protocol ([BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)) is an exterior gateway protocol that is used to exchange routing information between autonomous systems. An autonomous system ([AS](https://en.wikipedia.org/wiki/Autonomous_system_(Internet))) is an organizational unit of routing prefixes and policies. These AS are identified by a unique 16-bit, and later 32-bit, autonomous system number (ASN). For example, Facebook's ASN would be 32934 or as commonly presented AS32934. The power of BGP lies in its ability to communicate routing protocols and policies among tens of thousands of decentralized AS.
 
-The internet, and many other networks, are composed of many autonomous systems that communicate between each other. This communication is fascilitated by a peering session. These peering sessions allow two AS to exchange policies, routes and link status. All of this information is exchanged between two BGP daemons, which will be listening on TCP port 179.
+The internet, along with many other networks, is composed of many autonomous systems that communicate between each other. This communication is facilitated by a peering session, which allows two AS to exchange policies, routes and link status. All of this information is exchanged between two BGP daemons, which will be listening on TCP port 179.
 
-While BGP is considered an exterior gateway protocol, used for routing between large organizations on the internet, it can also be used from within an AS to allow their network engineers to better control the topology of their network. This is where the terms exterior BGP (eBGP) and interior BGP (iBGP) stem from. iBGP will be our focus for the rest of this tutorial. It is here that we will begin to experiment with manipulating these peering sessions using BIRD and it's interactive tool, birdc.
+While BGP is considered an exterior gateway protocol that is used for routing between large organizations on the internet, it can also be used within an AS to enable their network engineers to control the topology of their internal network. This is where the terms exterior BGP (eBGP) and interior BGP (iBGP) stem from. iBGP will be our focus for the rest of this tutorial. We will now start experimenting with these peering sessions using BIRD and its interactive command-line tool, birdc.
 
 ### Introduction to BIRD:
-BIRD is a fully functional routing daemon that supports many different routing protocols, including BGP. BIRD provides a simple configuration format and command line utility for interacting with sessions. BIRD also comes with built in support for both IPv4 and IPv6 and the respective tools to work with both protocols. 
+BIRD is a fully-functional routing daemon that supports many different routing protocols, including BGP. BIRD provides a simple configuration format and command line utility for interacting with sessions. BIRD also comes with built-in support for both IPv4 and IPv6 and the respective tools to work with both protocols. 
 
 #### Examining Sessions:
-Similiar to how we had tested that our vagrant environment had worked above we can view running sessions by running:
+Similiar to how we verified that our vagrant environment was provisioned properly, we can view running sessions by running:
 
 ```bash
 root@peer1:~# birdc show protocols                  
@@ -72,7 +71,7 @@ peer2    BGP      master   up     00:28:02    Established
 peer3    BGP      master   up     00:28:59    Established 
 ```
 
-This, at first glace, gives us a lot of information. However, let us focus on the last two entries, peer2 and peer3. Looking at these two entries, we can see that they are both BGP protocols and the info field mentions that they are Established. Each of these entries corresponds to a BGP session that we currently have open with our other nodes. To demonstrate the relationship of these values to our running sessions, let's stop the bird service on peer2.
+This gives us a lot of information. However, let us focus on the last two entries, peer2 and peer3. We can see that they are both BGP protocols and that the info field is Established. Each of these entries correspond to a BGP session that peer1 has open with peer2 and peer3. To demonstrate the relationship of these values to our running sessions, let's stop the bird service on peer2.
 
 ```bash
 root@peer2:~# systemctl stop bird 
@@ -88,7 +87,7 @@ peer2    BGP      master   up     12:06:07    Active      Socket: Connection ref
 peer3    BGP      master   up     12:07:07    Established
 ```
 
-By restarting BIRD on peer2, we should see this peering session reestablish.
+By restarting BIRD on peer2, a peering session should be reestablished.
 
 ```bash
 root@peer2:~# systemctl start bird
@@ -104,10 +103,10 @@ peer2    BGP      master   up     00:42:33    Established
 peer3    BGP      master   up     00:28:59    Established
 ```
 
-By stopping the bird daemon on peer2, we have made TCP connection to port 179 close between peer1 and peer2. Doing this changes our peer session from Established to Active. These Established and Active fields correspond to two of many BGP states, however for the sake of this tutorial we will focus only on Established and consider all other values as not-established. For those more curious, more information on session states can be found in the [wikipedia article on BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol#Finite-state_machines).
+By stopping the bird daemon on peer2, we have made the TCP connection on port 179 close between peer1 and peer2. Doing this changes our peer session from Established to Active. Established and Active correspond to two of many BGP states, however for the sake of this tutorial we will focus only on Established and consider all other values as not-established. For those more curious, more information on session states can be found in the [wikipedia article on BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol#Finite-state_machines).
 
 #### Configuring a BGP Session 
-While we now know how to check whether our session are up in our BGP playground, it's also important to understand how these sessions were configured in the first place. For that, we will begin to dig into the bird configuration files. To see this, we will look at the configuration files under /etc/bird on peer1.
+Although we now know how to check whether our session are up in our BGP playground, it's also important to understand how these sessions were configured in the first place. For that, we need to dig into the bird configuration files. Let's look at the configuration files under /etc/bird on peer1.
 
 ```bash
 root@peer1:~# cat /etc/bird/bird.conf
@@ -143,7 +142,7 @@ protocol bgp peer2 {
 }
 ```
 
-We can see that the configuration to establish these initial sessions is very minimal. However, let's dig deeper into what actually makes this work. For that, we will focus on one specific block. Our protocol bgp peer2 block:
+We can see that the configuration to establish these initial sessions is very minimal. Let's dig deeper into what actually makes this work. For that, we will focus on one specific block. Our protocol bgp peer2 block:
 
 ```bash
 protocol bgp peer2 {
@@ -154,13 +153,12 @@ protocol bgp peer2 {
 }
 ```
 
-Earlier in this tutorial we discussed the difference between eBGP and iBGP and how large AS identify themselves with a unique ASN. However, a small section of the available ASN have been reserved for private iBGP use. This range is 64512 - 65534. Knowing this, we can see that we have allocated a ASN from the private range to our peer2. This _local as_ statement refers to the ASN of your local machine. In this case peer1 is assigned the ASN 64512.
+Earlier in this tutorial, we discussed the difference between eBGP and iBGP and how large AS identify themselves with a unique ASN. However, a small section of the available ASN have been reserved for private iBGP use. This range is 64512 - 65534. Knowing this, we can see that we have allocated a ASN from the private range to our peer2. This _local as_ statement refers to the ASN of your local machine. In this case, peer1 is assigned the ASN 64512.
 
-Looking at the next statement, we can see a neighbor statement with both an IP and an additional AS. This IP corresponds to the host, or neighbor in BGP lingo, that we are attempting to establish a session with while the AS 64513 corresponds to the AS we've assigned to the host, peer2. We can confirm this by looking at the configuration file on peer2, which i've truncated a bit for clarity.
+Looking at the next statement, we can see a neighbor statement with both an IP and an additional AS. This IP corresponds to the host, or neighbor in BGP lingo, that we are attempting to establish a session with, while the AS 64513 corresponds to the AS we've assigned to the host, peer2. We can confirm this by looking at the configuration file on peer2.
 
 ```bash
 root@peer2:~# cat /etc/bird/bird.conf.d/bgp_peer1.conf
-...
 protocol bgp peer1 {
   local as 64513;
   neighbor 10.0.0.10 as 64512;
@@ -170,11 +168,11 @@ protocol bgp peer1 {
 
 It is these two directives in our protocol BGP blocks that handle the initial establishment of sessions.
 
-While establishing and maintaining sessions is crucial to your operation of BGP, established sessions alone will not allow you to route any traffic. In the next section, we will explore some of the other elements of our configuration files and how we can use those to being to discover and announce routes between our nodes.
+While establishing and maintaining sessions is crucial to the operation of BGP, established sessions alone will not allow you to route any traffic. In the next section, we will explore some of the other elements of our configuration files and how we can use them to discover and announce routes between our nodes.
 
 ### Advertising Routes with BGP:
 #### Kernel Protocol:
-Before we begin communicating routes between bird daemons, we should first understand how BIRD communicates routes between the linux kernel and the BIRD daemon. This is where that kernel protocol block we saw earlier comes into play.
+Before we begin announcing routes between bird daemons, we should first understand how BIRD communicates routes between the linux kernel and the BIRD daemon. This is where that kernel protocol block we saw earlier comes into play.
 
 ```
 protocol kernel {
@@ -185,7 +183,7 @@ protocol kernel {
 }
 ```
 
-There are many options that can be specified in the kernel block, and more information on those can be found [here](http://bird.network.cz/?get_doc&f=bird-6.html#ss6.6), however the bulk of of what we want to do is defined by the import/export definitions.
+There are many options that can be specified in the kernel block, and more information on those can be found [here](http://bird.network.cz/?get_doc&f=bird-6.html#ss6.6), however the bulk of what we want to do is defined by the import/export definitions.
 
 ```
 import none;
@@ -209,10 +207,10 @@ The metric value is used by the linux kernel to determine the priority of a rout
 learn;
 ```
 
-Finally we will set the _learn_ directive which will allow other daemons to learn about routes from the kernel routing table.
+Finally, we will set the _learn_ directive which will allow other daemons to learn about routes from the kernel routing table.
 
 #### Discovering direct routes:
-Now that we have configured our BIRD daemons to communicated directly between the daemon and the kernel routing table, we will need to configure our peers to discover local direct routes. Since we will be adding these routes diretly into our loopback interface, lets configured the direct protocol to only use the lo interface.
+Now that we have configured our BIRD daemons to push routes directly to the kernel routing table, we will need to configure our peers to discover local direct routes. Since we will be adding these routes directly to our loopback interface, let's configure the direct protocol to only use the lo interface.
 
 ```bash
 root@peer2:~# cat /etc/bird/bird.conf.d/direct.conf
@@ -221,7 +219,7 @@ protocol direct {
 }
 ```
 
-At this point we will have no routes learned or announced and this can be verified with birdc.
+At this point, we will have no routes learned or announced, which can be verified with birdc.
 
 ```bash
 root@peer2:~# birdc show route all
@@ -229,7 +227,7 @@ BIRD 1.6.3 ready.
 ```
 
 #### Filtering imports and exports:
-Similarly to the kernel module, export and import can be used to control what is imported and exported into and out of a BGP peer. Lets begin by exploring the concept of filtering and how this can be used to control what routes will be announced or exported.
+Similar to the kernel module, export and import can be used to control what is imported and exported by of a BGP peer. Lets begin by exploring the concept of filtering and how it can be used to control what routes will be announced or exported.
 
 Filters in BIRD are basically functions that execute on routes, returning either _accept_ or _reject_. This allows us to apply a simple programming language to add logic to our routing policies. Filters can contain anything from a single statement to very complex logic. To begin, let's reimplement our none and all directives as filters, adding them to our bird.conf file above the include directive.
 
@@ -256,7 +254,7 @@ protocol bgp peer2 {
 }
 ```
 
-Functionally, this is identical to our original configuration, however now we can extend these settings with further logic. The power of these filters can be understood by researching the [filter scripting language](http://bird.network.cz/?get_doc&f=bird-5.html) further. To expand on what we have learned. Let's create a filter in our bird.conf on peer2 to control routes we want to announce to peer .
+Functionally, this is identical to our original configuration, however now we can extend these settings with further logic. The power of these filters can be understood by researching the [filter scripting language](http://bird.network.cz/?get_doc&f=bird-5.html) further. To expand on what we have learned, let's create a filter in our bird.conf on peer2 to control routes we want to announce to peer1.
 
 ```
 filter export_subnets {
@@ -279,7 +277,7 @@ protocol bgp peer1 {
 ```
 
 #### Announcing Routes with BIRD:
-We now have all the building blocks we need to begin announcing routes between peer1 and peer2. Prior to doing this let's recap what we have done. To begin, we've setup up our BIRD to communicate between its internal routing tables and the kernel routing tables with our kernel protocol. We've configured the BIRD daemon to learn routes from the loopback interface with the direct protocol. We've also configured peer1 to import routes from the other peers and export those routes. Finally we configured peer2 to only export ```192.168.5.5/32``` to peer1 with our export_subnets filter. However at this point we have no routes currently announced to peer1 from peer2.
+We now have all the building blocks we need to begin announcing routes between peer1 and peer2. Before we do thata, let's recap what we have done. To begin, we've configured the BIRD daemon to communicate between its internal routing tables and the kernel routing tables with our kernel protocol. We've configured the BIRD daemon to learn routes from the loopback interface with the direct protocol. We've also configured peer1 to import routes from the other peers and export those routes. Finally we configured peer2 to only export ```192.168.5.5/32``` to peer1 with our export_subnets filter. However, at this point we have no routes currently announced from peer2 to peer1.
 
 ```bash
 root@peer1:~# ip route
@@ -288,13 +286,13 @@ default viia 10.0.2.2 dev eth0
 10.0.2.0/24 dev eth0 proto kernel scope link src 10.0.2.15
 ```
 
-Since we've setup all the building blocks to learn our routes from from the loopback interface. We should be able to directly announce a route by adding an IP to the loopback on peer2
+Since we've set up all the building blocks to learn our routes from from the loopback interface. We should be able to directly announce a route by adding an IP to the loopback on peer2.
 
 ```bash
 root@peer2:~# ip a add 192.168.5.5/32 dev lo
 ```
 
-Now if we were to look at both birdc and the kernel routing table on peer1 we should begin to see routes on peer1 to this new IP.
+Now if we look at both birdc and the kernel routing table on peer1 we should begin to see routes on peer1 to this new IP.
 
 ```bash
 root@peer1:~# ip route
@@ -353,7 +351,7 @@ We can tell this is happening by viewing the AS PATH. By looking at the AS PATH 
 BGP.as_path: 64512 64513
 ```
 
-Because peer1 was configured to export routes to peer3 and peer3 was configured to import routes from peer1 we were able to get this route into the BIRD routing table on peer3. Then, because we have the kernel protocol configured to export routes in BIRD, these routes will make it into the kernel routing table on peer3.
+Because peer1 was configured to export routes to peer3, and because peer3 was configured to import routes from peer1, we were able to get this route into the BIRD routing table on peer3. Then, because we have the kernel protocol configured to export routes in BIRD, these routes will make it into the kernel routing table on peer3.
 
 ### Next steps:
-We've explored many concepts in this simple tutorial, however we've barely scratched the surface of what bird and by extension BGP can do. Feel free to use this playground to futher experiement with announcing and filtering routes. In later tutorials, we will dig deeper into how BGP works and the processes it uses to determine routes, including what communities and local preference is and how these can be used by your BGP daemon to choose the best path to a server. We will also explore what an anycasted IP is and how we can configure high-availability with BGP. BGP can give you a significant amount of control over the topology of your network.
+We've explored many concepts in this simple tutorial, however we've barely scratched the surface of what bird and by extension BGP can do. Feel free to use this playground to further experiement with announcing and filtering routes. In later tutorials, we will dig deeper into how BGP works and the processes it uses to determine routes, including what communities and local preference are and how these can be used by your BGP daemon to choose the best path to a server. We will also explore what an anycasted IP is and how we can configure high-availability with BGP. BGP can give you a significant amount of control over the topology of your network.
