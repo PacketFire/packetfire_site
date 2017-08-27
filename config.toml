@@ -30,7 +30,7 @@ theme = "packetfire"
     weight = 3
 
 [[menu.icon]]
-    url = "https://discord.gg/jJV78ANw"
+    url = "https://discord.gg/jJV7ANw"
     name = "commenting-o"
     weight = 1
 
