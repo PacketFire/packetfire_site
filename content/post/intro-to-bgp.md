@@ -142,7 +142,7 @@ protocol bgp peer2 {
 }
 ```
 
-We can see that the configuration to establish these initial sessions is very minimal. Let's dig deeper into what actually makes this work. For that, we will focus on one specific block. Our protocol bgp peer2 block:
+We can see that the configuration required to establish these initial sessions is very minimal. Let's dig deeper into what actually makes this work. For that, we will focus on one specific block. Our protocol bgp peer2 block:
 
 ```bash
 protocol bgp peer2 {
@@ -168,7 +168,9 @@ protocol bgp peer1 {
 
 It is these two directives in our protocol BGP blocks that handle the initial establishment of sessions.
 
-While establishing and maintaining sessions is crucial to the operation of BGP, established sessions alone will not allow you to route any traffic. In the next section, we will explore some of the other elements of our configuration files and how we can use them to discover and announce routes between our nodes.
+While establishing and maintaining sessions is crucial to the operation of BGP, established sessions alone will not allow you to route any traffic. In the next section, we will explore some of the other elements of our configuration files and how we can use them to discover and announce routes between our nodes. Before we proceed with doing this. I'd like to review our current topology.
+
+Currently we have three nodes in our network, peer1 (AS64512), peer2 (AS64513) and peer3 (AS64514). These are configured in the same broadcast domain however the peering is structured like peer3 <-> peer1 <-> peer2. This structure allows communication of routes from either peer2 or peer3 through our route server, peer1. Please keep this topology in mind as we proceed with the next step of this tutorial, advertising routes.
 
 ### Advertising Routes with BGP:
 #### Kernel Protocol:
@@ -227,7 +229,7 @@ BIRD 1.6.3 ready.
 ```
 
 #### Filtering imports and exports:
-Similar to the kernel module, export and import can be used to control what is imported and exported by of a BGP peer. Lets begin by exploring the concept of filtering and how it can be used to control what routes will be announced or exported.
+Similar to the kernel module, export and import can be used to control what is imported and exported by a BGP peer. Lets begin by exploring the concept of filtering and how it can be used to control what routes will be announced or exported.
 
 Filters in BIRD are basically functions that execute on routes, returning either _accept_ or _reject_. This allows us to apply a simple programming language to add logic to our routing policies. Filters can contain anything from a single statement to very complex logic. To begin, let's reimplement our none and all directives as filters, adding them to our bird.conf file above the include directive.
 
@@ -277,7 +279,7 @@ protocol bgp peer1 {
 ```
 
 #### Announcing Routes with BIRD:
-We now have all the building blocks we need to begin announcing routes between peer1 and peer2. Before we do thata, let's recap what we have done. To begin, we've configured the BIRD daemon to communicate between its internal routing tables and the kernel routing tables with our kernel protocol. We've configured the BIRD daemon to learn routes from the loopback interface with the direct protocol. We've also configured peer1 to import routes from the other peers and export those routes. Finally we configured peer2 to only export ```192.168.5.5/32``` to peer1 with our export_subnets filter. However, at this point we have no routes currently announced from peer2 to peer1.
+We now have all the building blocks we need to begin announcing routes between peer1 and peer2. Before we do that, let's recap what we have done. To begin, we've configured the BIRD daemon to communicate between its internal routing tables and the kernel routing tables with our kernel protocol. We've configured the BIRD daemon to learn routes from the loopback interface with the direct protocol. We've also configured peer1 to import routes from the other peers and export those routes. Finally we configured peer2 to only export ```192.168.5.5/32``` to peer1 with our export_subnets filter. However, at this point we have no routes currently announced from peer2 to peer1.
 
 ```bash
 root@peer1:~# ip route
