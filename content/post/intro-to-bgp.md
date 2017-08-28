@@ -229,7 +229,7 @@ BIRD 1.6.3 ready.
 ```
 
 #### Filtering imports and exports:
-Similar to the kernel module, export and import can be used to control what is imported and exported by a BGP peer. Lets begin by exploring the concept of filtering and how it can be used to control what routes will be announced or exported.
+Similar to the kernel module, export and import can be used to control what is imported and exported by a BGP peer. Let's begin by exploring the concept of filtering and how it can be used to control what routes will be announced or exported.
 
 Filters in BIRD are basically functions that execute on routes, returning either _accept_ or _reject_. This allows us to apply a simple programming language to add logic to our routing policies. Filters can contain anything from a single statement to very complex logic. To begin, let's reimplement our none and all directives as filters, adding them to our bird.conf file above the include directive.
 
