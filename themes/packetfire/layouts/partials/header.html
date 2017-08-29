@@ -16,6 +16,12 @@
         {{ if .Description }}<meta property="og:description" content="{{ .Description }}" />
         {{ else }}<meta property="og:description" content="{{ .Site.Params.Description }}" />{{ end }}
         <meta property="og:image" content="{{ .Site.BaseURL }}/img/pf-logo.png" />
+
+        <meta property="twitter:card" content="summary" />
+        <meta property="twitter:title" content="{{ .Title }}" />
+        {{ if .Description }}<meta property="twitter:description" content="{{ .Description }}" />
+        {{ else }}<meta property="twitter:description" content="{{ .Site.Params.Description }}" />{{ end }}
+        <meta property="twitter:image" content="{{ .Site.BaseURL }}/img/pf-logo.png" />
     </head>
 
     <body>
