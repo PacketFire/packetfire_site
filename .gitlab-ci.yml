@@ -9,6 +9,6 @@ build:
     - echo $RSYNC_PASSWORD > /tmp/rsync_password
     - "rsync -arvzh --progress --delete --password-file=/tmp/rsync_password public/* $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/"
     - rm -rf /tmp/rsync_password
-    - curl -kH "Content-type: application/json" -H "Accept: application/json" -d '{"urls": [{"url": "http://www.packetfire.org/*"}]}' 'https://api.belugacdn.com/api/cdn/v2/invalidations' -u "$CDN_USER:$CDN_PASSWORD" -sD -
+    - 'curl -kH "Content-type: application/json" -H "Accept: application/json" -d "{\"urls\": [{\"url\": \"http://www.packetfire.org/*\"}]}" "https://api.belugacdn.com/api/cdn/v2/invalidations" -u "$CDN_USER:$CDN_PASSWORD" -s'
   only:
-    - master
+    - master 
