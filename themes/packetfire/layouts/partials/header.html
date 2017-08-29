@@ -11,6 +11,11 @@
 
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
+        <meta property="og:title" content="{{ .Title }}" />
+        <meta property="og:url" content="{{ .Permalink }}" />
+        {{ if .Description }}<meta property="og:description" content="{{ .Description }}" />
+        {{ else }}<meta property="og:description" content="{{ .Site.Params.Description }}" />{{ end }}
+        <meta property="og:image" content="{{ .Site.BaseURL }}img/pf-logo.png" />
     </head>
 
     <body>
