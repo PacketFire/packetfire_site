@@ -39,10 +39,11 @@ vagrant@peer1:~$ sudo su -
 root@peer1:~# birdc show protocols
 BIRD 1.6.3 ready.
 name     proto    table    state  since       info
-kernel1  Kernel   master   up     12:05:06    
-device1  Device   master   up     12:05:06    
-peer2    BGP      master   up     12:06:07    Established   
+peer2    BGP      master   up     12:06:07    Established
 peer3    BGP      master   up     12:07:07    Established
+device1  Device   master   up     12:05:06    
+direct1  Direct   master   up     12:05:06    
+kernel1  Kernel   master   up     12:05:06    
 ```
 
 If you see that peer2 and peer3 are "Established", everything is working as expected and we are ready to go. Before we begin playing with this playground, I will provide a brief overview of how BGP works.
@@ -65,10 +66,11 @@ Similiar to how we verified that our vagrant environment was provisioned properl
 root@peer1:~# birdc show protocols                  
 BIRD 1.6.3 ready.         
 name     proto    table    state  since       info  
-kernel1  Kernel   master   up     00:27:05          
-device1  Device   master   up     00:27:05          
 peer2    BGP      master   up     00:28:02    Established
 peer3    BGP      master   up     00:28:59    Established 
+device1  Device   master   up     00:28:59        
+direct1  Direct   master   up     00:27:05    
+kernel1  Kernel   master   up     00:27:05          
 ```
 
 This gives us a lot of information. However, let us focus on the last two entries, peer2 and peer3. We can see that they are both BGP protocols and that the info field is Established. Each of these entries correspond to a BGP session that peer1 has open with peer2 and peer3. To demonstrate the relationship of these values to our running sessions, let's stop the bird service on peer2.
@@ -81,10 +83,11 @@ root@peer2:~# systemctl stop bird
 root@peer1:~# birdc show protocols
 BIRD 1.6.3 ready.
 name     proto    table    state  since       info
-kernel1  Kernel   master   up     12:05:06    
-device1  Device   master   up     12:05:06    
 peer2    BGP      master   up     12:06:07    Active      Socket: Connection refused 
 peer3    BGP      master   up     12:07:07    Established
+device1  Device   master   up     12:05:06   
+direct1  Direct   master   up     12:05:06    
+kernel1  Kernel   master   up     12:05:06    
 ```
 
 By restarting BIRD on peer2, a peering session should be reestablished.
@@ -97,10 +100,11 @@ root@peer2:~# systemctl start bird
 root@peer1:~# birdc show protocols
 BIRD 1.6.3 ready.
 name     proto    table    state  since       info
-kernel1  Kernel   master   up     00:27:05    
-device1  Device   master   up     00:27:05    
 peer2    BGP      master   up     00:42:33    Established   
 peer3    BGP      master   up     00:28:59    Established
+device1  Device   master   up     00:27:05    
+direct1  Direct   master   up     00:27:05    
+kernel1  Kernel   master   up     00:27:05    
 ```
 
 By stopping the bird daemon on peer2, we have made the TCP connection on port 179 close between peer1 and peer2. Doing this changes our peer session from Established to Active. Established and Active correspond to two of many BGP states, however for the sake of this tutorial we will focus only on Established and consider all other values as not-established. For those more curious, more information on session states can be found in the [wikipedia article on BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol#Finite-state_machines).
@@ -178,7 +182,7 @@ Before we begin announcing routes between bird daemons, we should first understa
 
 ```
 protocol kernel {
-  metric 64;
+  metric 0;
   learn;
   import none;
   export all; 
@@ -216,6 +220,15 @@ Now that we have configured our BIRD daemons to push routes directly to the kern
 
 ```bash
 root@peer2:~# cat /etc/bird/bird.conf.d/direct.conf
+protocol direct {
+  interface "lo";
+}
+```
+
+Since we also have peer3 on our network, let's do the same on this host to prevent any other routes from being announced.
+
+```
+root@peer3:~# cat /etc/bird/bird.conf.d/direct.conf
 protocol direct {
   interface "lo";
 }
@@ -286,6 +299,7 @@ root@peer1:~# ip route
 default viia 10.0.2.2 dev eth0
 10.0.0.0/24 dev eth1 proto kernel scope link src 10.0.0.10
 10.0.2.0/24 dev eth0 proto kernel scope link src 10.0.2.15
+10.0.100.0/24 dev eth2 proto kernel scope link src 10.0.100.10
 ```
 
 Since we've set up all the building blocks to learn our routes from from the loopback interface. We should be able to directly announce a route by adding an IP to the loopback on peer2.
@@ -301,12 +315,17 @@ root@peer1:~# ip route
 default viia 10.0.2.2 dev eth0
 10.0.0.0/24 dev eth1 proto kernel scope link src 10.0.0.10
 10.0.2.0/24 dev eth0 proto kernel scope link src 10.0.2.15
+10.0.100.0/24 dev eth2 proto kernel scope link src 10.0.100.10
 192.168.5.5 via 10.0.0.11 dev eth1 proto bird
 ```
 
 ```bash
 root@peer1:~# birdc show route all                                            
 BIRD 1.6.3 ready.
+10.0.0.0/24        dev eth1 [direct1 00:33:24] * (240)     
+        Type: device unicast univ                          
+10.0.100.0/24      dev eth2 [direct1 00:33:24] * (240)     
+        Type: device unicast univ     
 192.168.5.5/32     via 10.0.0.11 on eth1 [peer2 14:11:33] * (100) [AS64513i]
         Type: BGP unicast univ
         BGP.origin: IGP
@@ -327,17 +346,32 @@ PING 192.168.5.5 (192.168.5.5) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.627/0.627/0.627/0.000 ms
 ```
 
-We can also see that we can now see that these routes are being forwarded on to peer3 via peer1.
+We can also see that we can now see that these routes are being announced on to peer3 via peer1.
 
 ```bash
 root@peer3:~# birdc show route all
 BIRD 1.6.3 ready.
+10.0.0.0/24        via 10.0.100.10 on eth1 [peer1 00:34:38] * (100) [AS64512i]
+        Type: BGP unicast univ
+        BGP.origin: IGP
+        BGP.as_path: 64512
+        BGP.next_hop: 10.0.100.10
+        BGP.local_pref: 100
+10.0.100.0/24      via 10.0.100.10 on eth1 [peer1 00:34:38] ! (100) [AS64512i]
+        Type: BGP unicast univ
+        BGP.origin: IGP
+        BGP.as_path: 64512
+        BGP.next_hop: 10.0.100.10
+        BGP.local_pref: 100
 192.168.5.5/32     via 10.0.0.11 on eth1 [peer1 14:30:34 from 10.0.0.10] * (100) [AS64513i]
         Type: BGP unicast univ
         BGP.origin: IGP
         BGP.as_path: 64512 64513
         BGP.next_hop: 10.0.0.11
         BGP.local_pref: 100
+```
+
+```
 root@peer3:~# ping -c 1 192.168.5.5
 PING 192.168.5.5 (192.168.5.5) 56(84) bytes of data.
 64 bytes from 192.168.5.5: icmp_seq=1 ttl=64 time=0.176 ms
@@ -345,6 +379,13 @@ PING 192.168.5.5 (192.168.5.5) 56(84) bytes of data.
 --- 192.168.5.5 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
 rtt min/avg/max/mdev = 0.176/0.176/0.176/0.000 ms
+```
+
+```
+root@peer3:~# traceroute 192.168.5.5
+traceroute to 192.168.5.5 (192.168.5.5), 30 hops max, 60 byte packets
+ 1  10.0.100.10 (10.0.100.10)  0.291 ms  0.206 ms  0.156 ms
+ 2  192.168.5.5 (192.168.5.5)  1.132 ms  1.092 ms  1.066 ms
 ```
 
 We can tell this is happening by viewing the AS PATH. By looking at the AS PATH associated with the route in birdc we can see that the route announced from 64513 to 64512 before reaching peer3.
@@ -356,4 +397,4 @@ BGP.as_path: 64512 64513
 Because peer1 was configured to export routes to peer3, and because peer3 was configured to import routes from peer1, we were able to get this route into the BIRD routing table on peer3. Then, because we have the kernel protocol configured to export routes in BIRD, these routes will make it into the kernel routing table on peer3.
 
 ### Next steps:
-We've explored many concepts in this simple tutorial, however we've barely scratched the surface of what bird and by extension BGP can do. Feel free to use this playground to further experiement with announcing and filtering routes. In later tutorials, we will dig deeper into how BGP works and the processes it uses to determine routes, including what communities and local preference are and how these can be used by your BGP daemon to choose the best path to a server. We will also explore what an anycasted IP is and how we can configure high-availability with BGP. BGP can give you a significant amount of control over the topology of your network.
+We've explored many concepts in this simple tutorial, however we've barely scratched the surface of what bird and, by extension, BGP can do. Feel free to use this playground to further experiement with announcing and filtering routes. In later tutorials, we will dig deeper into how BGP works and the processes it uses to determine routes, including what communities and local preference are and how these can be used by your BGP daemon to choose the best path to a server. We will also explore what an anycasted IP is and how we can configure high-availability with BGP as well as how we can use filtering policies, in place of our direct interface policies, to control what prefixes are announced to each node. BGP can give you a significant amount of control over the topology of your network and understanding how to use it will allow you to better shape your network to how you see fit.
