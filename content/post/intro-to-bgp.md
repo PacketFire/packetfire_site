@@ -11,13 +11,13 @@ Border Gateway Protocol (BGP) is one of the core technologies involved in making
 
 By the end of this tutorial, you will be familiar with the core concepts of BGP and have the proper vocabulary to communicate this to another network engineer. You will also be able to use a userland routing daemon, BIRD, to establish peering sessions and begin announcing routes.
 
-I plan to achieve this using a virtualized vagrant playground which can be downloaded [here](https://gitlab.packetfire.org/crunchbite/bird_examples.git). In order to complete this tutorial you will need to install vagrant 1.6+, git and rsync.
+I plan to achieve this using a virtualized vagrant playground which can be downloaded [here](https://github.com/ncatelli/bird_examples.git). In order to complete this tutorial you will need to install vagrant 1.6+, git and rsync.
 
 ### Setup:
-To begin, you will need to clone the repo and all submodules of the [bird_examples](https://gitlab.packetfire.org/crunchbite/bird_examples.git) project.
+To begin, you will need to clone the repo and all submodules of the [bird_examples](https://github.com/ncatelli/bird_examples.git) project.
 
 ```bash
-ncatelli@ofet> git clone https://gitlab.packetfire.org/crunchbite/bird_examples.git
+ncatelli@ofet> git clone https://github.com/ncatelli/bird_examples.git
 ncatelli@ofet> cd bird_examples
 ncatelli@ofet> git submodule init
 ncatelli@ofet> git submodule update
