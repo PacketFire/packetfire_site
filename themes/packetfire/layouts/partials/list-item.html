@@ -1,7 +1,7 @@
 <div class="item">
 
     {{ $.Scratch.Set "link" .RelPermalink }}
-    {{ with .Params.repo }} {{ printf "https://github.com/%s/%s/" $.Site.Params.githubUsername . | $.Scratch.Set "link" }} {{ end }}
+    {{ if .Params.projectlink }} {{ $.Scratch.Set "link" .Params.projectlink }} {{ end }}
 
     {{ .Date.Format (.Site.Params.dateFormat | default "January 2, 2006") | $.Scratch.Set "subtitle" }}
     {{ with .Description }} {{ $.Scratch.Set "subtitle" . }} {{ end }}
