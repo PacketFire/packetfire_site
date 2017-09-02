@@ -14,6 +14,9 @@ theme = "packetfire"
     highlightLanguages = ["go", "haskell", "kotlin", "scala", "swift"]
     copyright = "&copy; All rights reserved by [Packetfire](http://packetfire.org/)"
 
+[taxonomies]
+  author = "author"
+
 [[menu.main]]
     url = "/"
     name = "Home"
