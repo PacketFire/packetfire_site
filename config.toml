@@ -16,6 +16,7 @@ theme = "packetfire"
 
 [taxonomies]
   author = "author"
+  tag = "tags"
 
 [[menu.main]]
     url = "/"
