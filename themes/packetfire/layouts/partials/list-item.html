@@ -9,6 +9,6 @@
     <h4><a href="{{ .Scratch.Get "link" }}">{{ .Title }}</a></h4>
     {{ if .Params.author }}<h5><a href="{{ "" | absURL }}/author/{{ .Params.author | urlize }}">{{ .Params.author }}</a></h5>{{ end }}
     <h5>{{ $.Scratch.Get "subtitle" }}</h5>
-    {{ range .Params.tags }}<a href="{{ "" | absURL }}/author/{{ . | urlize }}"><kbd class="item-tag">{{ . }}</kbd></a>{{ end }}
+    {{ range .Params.tags }}<a href="{{ "" | absURL }}/tags/{{ . | urlize }}"><kbd class="item-tag">{{ . }}</kbd></a>{{ end }}
 
 </div>
