@@ -4,6 +4,7 @@ date: 2017-08-21T13:43:28-04:00
 author: "Nate Catelli"
 tags: ["networking"]
 description: "An introductory tutorial on BGP using BIRD and vagrant."
+type: "post"
 draft: false
 ---
 
