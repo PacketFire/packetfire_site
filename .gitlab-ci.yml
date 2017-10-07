@@ -3,7 +3,7 @@ image: ncatelli/hugo_builder:v0.29
 build:
   stage: build
   script:
-    - hugo
+    - /usr/local/bin/hugo
     - echo $RSYNC_PASSWORD > /tmp/rsync_password
     - "rsync -arvzh --progress --delete --password-file=/tmp/rsync_password public/* $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/"
     - rm -rf /tmp/rsync_password
