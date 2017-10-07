@@ -1,10 +1,8 @@
-image: debian:9.1
+image: ncatelli/hugo_builder:v0.29 
 
 build:
   stage: build
   script:
-    - apt-get update -y
-    - apt-get install -y hugo rsync curl
     - hugo
     - echo $RSYNC_PASSWORD > /tmp/rsync_password
     - "rsync -arvzh --progress --delete --password-file=/tmp/rsync_password public/* $RSYNC_USER@$TARGET_SERVER::$RSYNC_PATH/"
