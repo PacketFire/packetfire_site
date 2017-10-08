@@ -46,5 +46,4 @@ direct1  Direct   master   up     12:05:06
 kernel1  Kernel   master   up     12:05:06    
 ```
 
-If you see that peer2 and peer3 are "Established", everything is working as expected and we are ready to go. Before we begin playing with this playground, I will provide a brief overview of how BGP works.
-
+If you see that peer2 and peer3 are "Established", everything is working as expected and we are ready to go. Before we begin working with this playground, in the next section I will begin reviewing how best path selection is accomplished in BGP.
