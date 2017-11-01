@@ -14,38 +14,23 @@ One of my favorite features of golang is it's simple toolchain for builds. Howev
 ### Wrapping Common Go Commands:
 Primarily I leverage four of the go toolchain's subcommands more than anything else and I begin by wrapping the make in similarly named make blocks. At the top of the file I typically define the package name.
 
+The fmt command is mostly a copy paste of the corresponding go command. with test being is where we leverage one small feature of make, chaining blocks. This allows us to insure that our package is linted prior to running our tests. Finally I also typically implement a block to render the documentation into a README.md.
+
 ```
 PKG="github.com/ncatelli/examplepkg"
-```
 
-#### go fmt:
-The fmt command is mostly a copy paste of the corresponding go command.
-
-```
-fmt:
-  go fmt $(PKG)
-```
-
-#### go test:
-Test is where we leverage one small feature of make, chaining blocks. This allows us to insure that our package is linted prior to running our tests.
-
-```
-test: fmt
-  go test $(PKG)
-```
-
-#### go build:
-We take advantage of this for our build as well, allowing us to run both our linting and unit tests prior to running a build with a single command.
-
-```
 build: | fmt test
   go build $(PKG)
-```
 
-#### godoc:
-Finally I also typically implement a sort cut to generate the documentation into a README.md
+fmt:
+  go fmt $(PKG)
 
-```
+test: fmt
+  go test $(PKG)
+
 doc:
   godoc $(PKG) > $(GOPATH)/src/$(PKG)/README.md
 ```
+
+### Use with cGo:
+
