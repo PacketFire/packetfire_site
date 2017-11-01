@@ -19,18 +19,24 @@ PKG="github.com/ncatelli/examplepkg"
 ```
 
 #### go fmt:
+The fmt command is mostly a copy paste of the corresponding go command.
+
 ```
 fmt:
   go fmt $(PKG)
 ```
 
 #### go test:
+Test is where we leverage one small feature of make, chaining blocks. This allows us to insure that our package is linted prior to running our tests.
+
 ```
 test: fmt
   go test $(PKG)
 ```
 
 #### go build:
+We take advantage of this for our build as well, allowing us to run both our linting and unit tests prior to running a build with a single command.
+
 ```
 build: | fmt test
   go build $(PKG)
