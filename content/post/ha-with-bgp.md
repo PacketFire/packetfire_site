@@ -50,4 +50,4 @@ If you see that peer2 and peer3 are "Established", everything is working as expe
 
 ### BGP Path Selection:
 #### Best Path Selection Algorithm:
-The BGP specification defines an algorithm that is used to determine the best path to a route. This is used to determine which 
+The BGP specification defines an algorithm that is used to determine the best path to a route. Understanding how your paths will be determined is essential for any network engineer and I will briefly review how this is determined below. That being said, I'd urge the reader to read through [Cisco's documentation](https://www.cisco.com/c/en/us/support/docs/ip/border-gateway-protocol-bgp/13753-25.html) on the best path selection algorithm as this will cover it in much greater detail. 
