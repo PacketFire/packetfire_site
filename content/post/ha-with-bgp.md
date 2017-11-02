@@ -1,6 +1,6 @@
 ---
 title: "High-Availability with BGP using BIRD"
-date: 2017-10-08T00:00:00-04:00
+date: 2017-11-02T00:00:00-04:00
 author: "Nate Catelli"
 tags: ["networking"]
 description: "Using BIRD to provide high-availability using routing."
