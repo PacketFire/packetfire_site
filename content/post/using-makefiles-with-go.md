@@ -64,7 +64,7 @@ clean:
 ```
 
 ### Leveraging Docker Environments in Makefiles:
-If you are not using cGo, you can still derive benefits from the Makefiles abstraction by wrapping a docker build environment. I've included an example of a Makefile from our pasteclick project that wraps a small docker environment with libmagic installed.
+If you are not using cGo, you can still benefit from the Makefiles abstraction by wrapping a docker build environment. I've included an example of a Makefile from our pasteclick project that wraps a small docker environment with libmagic installed.
 
 ```
 PKG="gitlab.packetfire.org/Tiksi/paste-click"
@@ -80,7 +80,7 @@ test: fmt
   docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go test $(PKG)
 ```
 
-Leveraging a container and make, one is able to provide a consistent build process in a build environment that is repeatable accross platforms.
+Leveraging a container and make, one is able to provide a consistent build process in a build environment that is repeatable across platforms.
 
 ### Summary:
 While the go toolchain is sufficient for purely go packages, leveraging simple makefiles to augment this toolchain with additional tasks is a simple and viable option for keeping your build processes down to a few concise commands.
