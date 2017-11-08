@@ -32,7 +32,7 @@ doc:
   godoc $(PKG) > $(GOPATH)/src/$(PKG)/README.md
 ```
 
-### Use with cGo:
+### Use With cGo:
 Though simply wrapping the go toolchain appears to add very little value while adding additional complexity, we begin to see greater benefit when dealing with additional external C libraries. My first use of makefiles with go was while working with [libfreeipmi](https://www.gnu.org/software/freeipmi/). At the time, I was attempting to implement golang bindings for a limited subset of libfreeipmi which required building the shared objects for libfreeipmi from source. Adding this build process to the makefile simplified the building of the library and was easily defined by adding a few extra blocks:
 
 ```
@@ -62,6 +62,25 @@ clean:
   cd libs/freeipmi; \
   make clean
 ```
+
+### Leveraging Docker Environments in Makefiles:
+If you are not using cGo, you can still derive benefits from the Makefiles abstraction by wrapping a docker build environment. I've included an example of a Makefile from our pasteclick project that wraps a small docker environment with libmagic installed.
+
+```
+PKG="gitlab.packetfire.org/Tiksi/paste-click"
+GOENV="ncatelli/golang:1.9.2-libmagic"
+
+build: | test
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go build $(PKG)
+
+fmt:
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go fmt $(PKG)
+
+test: fmt
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go test $(PKG)
+```
+
+Leveraging a container and make, one is able to provide a consistent build process in a build environment that is repeatable accross platforms.
 
 ### Summary:
 While the go toolchain is sufficient for purely go packages, leveraging simple makefiles to augment this toolchain with additional tasks is a simple and viable option for keeping your build processes down to a few concise commands.
