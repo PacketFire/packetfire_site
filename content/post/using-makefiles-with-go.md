@@ -25,7 +25,7 @@ build: | test
 fmt:
   go fmt $(PKG)
 
-test: fmt
+test: | fmt
   go test $(PKG)
 
 doc:
@@ -43,13 +43,13 @@ DEPSCONFOPTS=--enable-static --without-encryption
 build: | test
   go build $(BUILDOPTS) $(PKG)
 
-test: fmt deps
+test: | fmt deps
   go test $(BUILDOPTS) $(PKG) -v
 
 fmt:
   go fmt $(PKG)
 
-doc: fmt
+doc: | fmt
   godoc $(PKG) > $(GOPATH)/src/$(PKG)/README.md
 
 deps:
@@ -76,7 +76,7 @@ build: | test
 fmt:
   docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go fmt $(PKG)
 
-test: fmt
+test: | fmt
   docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go test $(PKG)
 ```
 
