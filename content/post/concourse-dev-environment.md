@@ -29,3 +29,62 @@ ncatelli@ofet> cd iptables_examples
 ncatelli@ofet> docker-compose up
 ```
 
+### Services
+The [docker-compose.yml](https://github.com/ncatelli/concourse-development-environment/blob/master/docker-compose.yml) in the above repo contains our 3 core services, web, worker and db, along with a sidecar to handle key generation, a service for the [fly](http://concourse-ci.org/fly-cli.html) cli utility and finally a synchronization service to wrap it all up. Below I will detail the purposes of each of these services and review their definitons.
+
+#### Required networks and volumes:
+To seperate service access, I've defined both a frontend and backend network to seperate the fly and worker services from postgres. I've also defined a flyrc volume for persisting the fly configurations across runs of the fly service.
+
+```yaml
+volumes:
+  flyrc:
+
+networks:
+  frontend:
+  backend:
+```
+
+
+#### Database Service:
+The db service is a a simple postgresql service which as a storage backend for concourse. We define a basic user, password database and storage location and add this service to the backend network so that only our concourse web api/ui service can communicate directly with our postgres service.
+
+```yaml
+  db:
+    image: postgres:9.6
+    environment:
+      POSTGRES_DB: concourse
+      POSTGRES_USER: concourse
+      POSTGRES_PASSWORD: changeme
+      PGDATA: /database
+    networks:
+      - backend
+```
+
+#### Web API/UI Service:
+The web api/ui service is a stateless service that handles all the build scheduling, user interation and worker managemement. This service primarily interacts with the 
+
+```yaml
+  web:
+    image: concourse/concourse
+    command: 
+      - web
+    ports: 
+      - "8080:8080"
+    volumes: 
+      - "./keys/web:/concourse-keys"
+    restart: unless-stopped 
+    environment:
+      CONCOURSE_BASIC_AUTH_USERNAME: concourse
+      CONCOURSE_BASIC_AUTH_PASSWORD: changeme
+      CONCOURSE_EXTERNAL_URL: "${CONCOURSE_EXTERNAL_URL}"
+      CONCOURSE_POSTGRES_HOST: 'db'
+      CONCOURSE_POSTGRES_USER: concourse
+      CONCOURSE_POSTGRES_PASSWORD: changeme
+      CONCOURSE_POSTGRES_DATABASE: concourse
+    networks:
+      - frontend
+      - backend
+    depends_on: 
+      - db
+      - ready
+```
