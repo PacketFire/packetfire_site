@@ -38,30 +38,16 @@ To seperate service access, I've defined both a frontend and backend network to 
 ```yaml
 volumes:
   flyrc:
+  web_keys:
+  worker_keys:
 
 networks:
   frontend:
   backend:
 ```
 
-
-#### Database Service:
-The db service is a a simple postgresql service which as a storage backend for concourse. We define a basic user, password database and storage location and add this service to the backend network so that only our concourse web api/ui service can communicate directly with our postgres service.
-
-```yaml
-  db:
-    image: postgres:9.6
-    environment:
-      POSTGRES_DB: concourse
-      POSTGRES_USER: concourse
-      POSTGRES_PASSWORD: changeme
-      PGDATA: /database
-    networks:
-      - backend
-```
-
 #### Web API/UI Service:
-The web api/ui service is a stateless service that handles all the build scheduling, user interation and worker managemement. This service primarily interacts with the 
+The web api/ui service is a stateless service that handles all the build scheduling, user interation and worker managemement. This service primarily interacts with the the end users, the workers and any polled resources to determine if a build should be scheduled.
 
 ```yaml
   web:
@@ -71,7 +57,7 @@ The web api/ui service is a stateless service that handles all the build schedul
     ports: 
       - "8080:8080"
     volumes: 
-      - "./keys/web:/concourse-keys"
+      - "web_keys:/concourse-keys:ro"
     restart: unless-stopped 
     environment:
       CONCOURSE_BASIC_AUTH_USERNAME: concourse
@@ -88,3 +74,127 @@ The web api/ui service is a stateless service that handles all the build schedul
       - db
       - ready
 ```
+
+This service has been configured to communicate with the postgres database and has been added to both the frontend and backend networks.
+
+#### Worker Service:
+The [worker service](https://github.com/ncatelli/concourse-development-environment/blob/master/worker/Dockerfile) handles the bulk of the work of our builds. The worker service continuously polls the web-api (ATC) for jobs. These jobs are configured to run within docker containers and thus it is important that we have access to the docker engine within our worker. The problem with the default docker-compose tutorial is that docker has not been added to our runner. We will extend both the compose file and a wrapper dockerfile to add docker to our worker.
+
+```yaml
+  worker:
+    build:
+      context: ./worker
+    privileged: true
+    command: worker
+    volumes: 
+      - "worker_keys:/concourse-keys:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      CONCOURSE_TSA_HOST: web
+    networks:
+      - frontend
+    depends_on:
+      - web
+```
+
+We've added the following volume `- "/var/run/docker.sock:/var/run/docker.sock"` to mount our lock host's docker socket into our worker container. Finally we will need to install the docker tooling on the local host.
+
+```dockerfile
+FROM concourse/concourse
+
+LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
+LABEL description="Containerized version of a concourse worker running docker."
+
+VOLUME /var/lib/docker
+
+RUN apt-get update -y && \
+    apt-get install curl -yq && \
+    curl -sSL https://get.docker.com/ | sh && \
+    apt-get clean
+```
+
+Since our goal is to invoke the concourse worker, we will simply extend the concourse image by triggering the docker install sh script. We should now be able to invoke builds on our worker.
+
+#### Keygen sidecar:
+We've showed both the worker and web containers that have corresponding keys volumes. Before we can start using our containers, we will need to create a sidecar container to generate these keys. This can be very quickly and minimally accomplished with an alpine container and openssh.
+
+```dockerfile
+FROM alpine:3.7
+
+LABEL description='Key generation sidecar for concourse-ci'
+LABEL maintainer='Nate Catelli <ncatelli@packetfire.org>'
+
+ENV KEY_DIR='/data'
+
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh && \
+    apk add --no-cache openssh
+
+VOLUME ${KEY_DIR}
+WORKDIR ${KEY_DIR}
+
+CMD ["/usr/local/bin/start.sh"]
+```
+
+We will create a small alpine image to generate our keys. We will then leverage the bash script provided by the concourse team to generate our keys.
+
+```sh
+#!/bin/sh
+
+mkdir -p ./web ./worker
+
+ssh-keygen -t rsa -f ./web/tsa_host_key -N ''
+ssh-keygen -t rsa -f ./web/session_signing_key -N ''
+
+ssh-keygen -t rsa -f ./worker/worker_key -N ''
+
+cp ./worker/worker_key.pub ./web/authorized_worker_keys
+cp ./web/tsa_host_key.pub ./worker
+```
+
+Finally we will mount volumes for each servies keys.
+
+```yaml
+  keygen_sidecar:
+    build:
+      context: ./keygen_sidecar
+    working_dir: "/data"
+    volumes:
+      - "worker_keys:/data/worker"
+      - "web_keys:/data/web"
+```
+
+#### Fly service:
+The [fly cli](http://concourse-ci.org/fly-cli.html) is used to interact directly with the web api and will be our main point of interaction with concourse. This tool can be used to create and trigger pipelines, inspect workers and check the state of jobs. Since fly is a static binary, we can simply wrap this in a small alpine image.
+
+```dockerfile
+FROM alpine:3.7
+
+ARG VERSION="3.9.2"
+
+LABEL description='Command container for concourse fly cli'
+LABEL maintainer='Nate Catelli <ncatelli@packetfire.org>'
+
+VOLUME /root
+
+ADD https://github.com/concourse/concourse/releases/download/v${VERSION}/fly_linux_amd64 /usr/local/bin/fly
+RUN chmod +x /usr/local/bin/fly
+
+ENTRYPOINT [ "/usr/local/bin/fly" ]
+CMD [ "-h" ]
+```
+
+Luckily, our main point of persistence for fly is the .flyrc file. Since our image is run as the root user, we can simply persist the state of our fly service by making the /root directory of our fly service a volume. We can then invoke this service any number of times without fear of losing our login credentials.
+
+```yaml
+  fly:
+    build:
+      context: ./fly
+      args:
+        VERSION: "3.9.2"
+    volumes:
+      - flyrc:/root
+    networks:
+      - frontend
+```
+
