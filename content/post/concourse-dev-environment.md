@@ -24,9 +24,9 @@ In order to proceed with this tutorial you will need to install the following to
 To begin, you will need to clone the [concourse dev environment repo](https://github.com/ncatelli/concourse-development-environment).
 
 ```bash
-ncatelli@ofet> git clone https://github.com/ncatelli/concourse-development-environment
-ncatelli@ofet> cd iptables_examples
-ncatelli@ofet> docker-compose up
+$ git clone https://github.com/ncatelli/concourse-development-environment
+$ cd iptables_examples
+$ docker-compose up
 ```
 
 ### Services
@@ -51,7 +51,7 @@ The web api/ui service is a stateless service that handles all the build schedul
 
 ```yaml
   web:
-    image: concourse/concourse
+    image: concourse/concourse:3.9.2
     command: 
       - web
     ports: 
@@ -100,7 +100,7 @@ The [worker service](https://github.com/ncatelli/concourse-development-environme
 We've added the following volume `- "/var/run/docker.sock:/var/run/docker.sock"` to mount our lock host's docker socket into our worker container. Finally we will need to install the docker tooling on the local host.
 
 ```dockerfile
-FROM concourse/concourse
+FROM concourse/concourse:3.9.2
 
 LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
 LABEL description="Containerized version of a concourse worker running docker."
@@ -198,3 +198,80 @@ Luckily, our main point of persistence for fly is the .flyrc file. Since our ima
       - frontend
 ```
 
+### Putting it all together
+Using all of these services we can now start our cluster with a `docker-compose up`. This should bring up each of our dependent services followed by the web-ui. This can be viewed by browsing to port 8080 on your localhost which should present you with and empty version of the web ui claiming that no pipelines are configured.
+
+#### Configuring a pipeline
+From this point, we can continue on with the concourse tutorial by pushing a simple hello world task to the concourse api using our fly service. We will begin by authenticating fly with the service. the following command connects to our concourse api using the basic auth credentials and under the `main` team name.
+
+```bash
+$ docker-compose run --entrypoint sh fly
+$ fly login -c http://web:8080 -u concourse -p changeme -t main
+$ fly ts
+name  url              team  expiry
+main  http://web:8080  main  Tue, 10 Apr 2018 01:22:41 UTC
+```
+
+We can then create a basic hello world pipeline using the following simple pipeline. Which we should save locally to `test-task.yml`.
+
+```yaml
+---
+jobs:
+- name: job-hello-world
+  public: true
+  plan:
+    - task: hello-world
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: ubuntu
+        run:
+          path: echo
+          args:
+            - hello world
+```
+
+We can finally push it to the concourse api with the following command. This applies our configuration and unpauses the pipeline. After running the following commands you should now see the pipeline in your web ui and you should be able to manually trigger this by clicking the job, and then clicking the `+` symbol in the top right corner.
+
+```bash
+$ fly -t main sp -c test-task.yaml -p helloworld
+apply configuration? [yN]: y
+pipeline created!
+you can view your pipeline here: http://web:8080/teams/main/pipelines/helloworld
+
+the pipeline is currently paused. to unpause, either:
+  - run the unpause-pipeline command
+  - click play next to the pipeline in the web ui
+$ fly -t main up -p helloworld
+```
+
+Optionally you may run the job via fly with the following trigger job command.
+
+```bash
+$ fly -t main gp -p helloworld
+groups: []
+resources: []
+resource_types: []
+jobs:
+- name: job-hello-world
+  public: true
+  plan:
+  - task: hello-world
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: ubuntu
+      run:
+        path: echo
+        args:
+        - hello world
+$ fly -t main tj -j helloworld/job-hello-world
+started helloworld/job-hello-world #2
+```
+
+### Conclusion
+This simple docker environment should be enough to get you started running your first concourse pipelines. To expand on your pipelines complexity, I'd recommend that you reference the greate tutorials at [concource tutorials](https://concoursetutorial.com/) as well as work your way through the [documentation](https://concourse-ci.org/docs.html) on the various components use to compose a pipeline.
