@@ -9,9 +9,9 @@ draft: false
 ---
 
 ### Introduction:
-Jenkins has predominantly been the bread and butter CI/CD tool for technology organizations, where very few tools have been able to compete with the expressiveness of its Groovy-based DSL and the extensibility of its plugin ecosystem. That being said, its tool API is not as straightforward as it could be and its configuration lends itself to eventually becoming a snowflake server on an organization's network. Because of this, I'm always on the lookout for new CI/CD tools to play with and [concourse-ci](https://concourse-ci.org/) caught my eye with its simple YAML-based configuration DSL and modular architecture. One of its most exciting features is how geared towards integrating every aspect of this tool with VCS, which serves to make this tool much easier to automate.
+Jenkins has predominantly been the bread and butter CI/CD tool for technology organizations, where very few tools have been able to compete with the expressiveness of its Groovy-based DSL and the extensibility of its plugin ecosystem. That being said, its tool API is not very straightforward and its configuration lends itself to eventually becoming a snowflake server on an organization's network. Because of this, I'm always looking for new CI/CD tools to play with. [concourse-ci](https://concourse-ci.org/) caught my eye with its simple YAML-based configuration DSL and modular architecture. One thing I like about concourse-ci is how easy it is to integrate with VCS, enabling a high degree of automation.
 
-Concourse-ci offers a few options for turning up a development environment. Many of them use a tool written by their parent organization, [Cloud Foundry](https://www.cloudfoundry.org/), called [bosh](https://bosh.io/). There is a docker-compose tutorial that offers an environment to play with the UI, but it's missing many core components that prevent it from being usable for large-scale testing. I've made some modifications to their docker-compose environment to make it useful for experimenting and developing concourse pipelines, detailed below.
+Concourse-ci offers a few options for turning up a development environment. Many of them use a tool written by its parent organization, [Cloud Foundry](https://www.cloudfoundry.org/), called [bosh](https://bosh.io/). There is a docker-compose tutorial that offers an environment to play with the UI, but it's missing many core components that prevents it from being usable for large-scale testing. I've made some modifications to their docker-compose environment, which makes it easier to experiment and develop concourse pipelines.
 
 ### Requirements:
 In order to proceed with this tutorial, you will need to install the following tools:
@@ -29,10 +29,10 @@ $ cd concourse-development-environment
 $ docker-compose up
 ```
 
-### Services
+### Services:
 The [docker-compose.yml](https://github.com/ncatelli/concourse-development-environment/blob/master/docker-compose.yml) in the repository defines 3 core services: web, worker and db. It also includes a sidecar to handle key generation, a service for the [fly](http://concourse-ci.org/fly-cli.html) cli utility, and a synchronization service to wrap it all together.
 
-#### Network and volumes
+#### Network and volumes:
 I've defined a frontend and backend network in order to separate the fly and worker services from postgres. I've also defined a flyrc volume for persisting the fly configurations across subsequent runs of the fly service.
 
 ```yaml
@@ -114,7 +114,7 @@ RUN apt-get update -y && \
 Since our goal is to invoke the concourse worker, we will simply extend the concourse image by triggering the Docker install shell script. We should now be able to schedule builds on our worker.
 
 #### Keygen sidecar:
-Both the worker and web containers that have keys volumes. Before we can start using our containers, we will need to create a sidecar container to generate these keys. This can be accomplished with an alpine container and openssh.
+Both the worker and web containers require keys in order to operate. Before we can start using our containers, we will need to create a sidecar container to generate these keys. This can be accomplished with an alpine container and openssh.
 
 ```dockerfile
 FROM alpine:3.7
@@ -134,7 +134,7 @@ WORKDIR ${KEY_DIR}
 CMD ["/usr/local/bin/start.sh"]
 ```
 
-We will create a small alpine image to generate our keys. We will then invoke the bash script provided by the concourse team to generate our keys.
+We will create a small alpine image to generate our keys. Then we will invoke a bash script provided by the concourse team that will generate our keys.
 
 ```sh
 #!/bin/sh
@@ -163,7 +163,7 @@ Finally, we will mount volumes for each service's keys.
 ```
 
 #### Fly service:
-The [fly cli](http://concourse-ci.org/fly-cli.html) is used to interact with the web API and will be our main point of interaction with concourse. It can be used to create and trigger pipelines, inspect workers and poll the state of jobs. Since fly is a static binary, we can wrap it in a small alpine image.
+The [fly cli](http://concourse-ci.org/fly-cli.html) is used to interact with the web API and will be our main point of interaction with concourse. It can be used to create and trigger pipelines, inspect workers and poll the states of jobs. Since fly is a static binary, we can wrap it in a small alpine image.
 
 ```dockerfile
 FROM alpine:3.7
@@ -196,10 +196,10 @@ Our main point of persistence for fly is the .flyrc file. Since our image is run
       - frontend
 ```
 
-### Putting it all together
+### Putting it all together:
 Using all of these services we can now start our cluster by running `docker-compose up`. This should bring up each of our dependent services followed by the web-ui. This can be viewed by browsing to port 8080 on your localhost which should present you with and empty version of the web UI, showing that no pipelines are configured.
 
-#### Configuring a pipeline
+#### Configuring a pipeline:
 Let's push a simple hello world task to the concourse api using our fly service. We will begin by authenticating fly with the service. The following command connects to our concourse api using the basic auth credentials under the `main` team name.
 
 ```bash
@@ -271,5 +271,5 @@ $ fly -t main tj -j helloworld/job-hello-world
 started helloworld/job-hello-world #2
 ```
 
-### Conclusion
+### Conclusion:
 This simple docker environment should be enough to get you started running your first concourse pipelines. To expand on your pipeline's complexity, I recommend referencing the great tutorials at [concource tutorials](https://concoursetutorial.com/) as well as working your way through the [documentation](https://concourse-ci.org/docs.html) on the various components involved in creating a pipeline.
