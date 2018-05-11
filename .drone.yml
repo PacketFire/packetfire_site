@@ -1,0 +1,6 @@
+pipeline: 
+  lint:
+    image: ncatelli/hugo_builder:v0.29 
+    pull: true
+    commands:
+      - /usr/local/bin/hugo
