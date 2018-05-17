@@ -8,6 +8,7 @@ pipeline:
     image: plugins/s3
     bucket: packetfire
     source: public/**
+    region: US
     target: /
     path_style: true
     endpoint: https://nyc3.digitaloceanspaces.com
