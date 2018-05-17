@@ -16,5 +16,3 @@ pipeline:
     target: /
     path_style: true
     endpoint: https://nyc3.digitaloceanspaces.com
-    when:
-      branch: master
