@@ -11,4 +11,4 @@ pipeline:
     source: public/*
     target: /
     endpoint: https://nyc3.digitaloceanspaces.com
-    secrets: [ aws_access_key_id, aws_secret_key_id ]
+    secrets: [ aws_access_key_id, aws_secret_access_key ]
