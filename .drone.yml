@@ -1,7 +1,7 @@
 pipeline: 
   render:
-    image: plugins/hugo:1.1
-    output: public
+    image: cbrgm/drone-hugo:latest
+    output: public/
     validate: true
   publish:
     image: plugins/s3:1
