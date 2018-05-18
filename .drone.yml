@@ -4,7 +4,6 @@ pipeline:
     pull: true
     commands:
       - /usr/local/bin/hugo
-      - ls -lah public
   publish:
     image: plugins/s3:1
     bucket: packetfire
