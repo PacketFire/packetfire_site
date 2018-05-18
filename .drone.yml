@@ -10,7 +10,6 @@ pipeline:
     strip_prefix: public/
     source: public/**/*
     target: /
-    endpoint: https://nyc3.digitaloceanspaces.com
     acl: public-read
     secrets: [ aws_access_key_id, aws_secret_access_key ]
     when:
