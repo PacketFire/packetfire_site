@@ -1,12 +1,10 @@
-workspace:
-  base: /work
-
 pipeline: 
   render:
     image: ncatelli/hugo_builder:v0.29 
     pull: true
     commands:
       - /usr/local/bin/hugo
+      - ls -lah
   publish:
     image: plugins/s3:1
     bucket: packetfire
