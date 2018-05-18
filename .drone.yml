@@ -7,7 +7,8 @@ pipeline:
   s3:
     image: plugins/s3
     bucket: packetfire
+    strip_prefix: public/
     source: public/*
     target: /
     endpoint: https://nyc3.digitaloceanspaces.com
-    secrets: [ access-key, secret-key ]
+    secrets: [ aws_access_key_id, aws_secret_key_id ]
