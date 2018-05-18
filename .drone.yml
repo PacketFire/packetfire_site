@@ -1,13 +1,13 @@
 pipeline: 
   render:
-    image: ncatelli/hugo_builder:v0.29 
-    pull: true
-    commands:
-      - /usr/local/bin/hugo
-  s3:
+    image: plugins/hugo:1.1
+    output: public
+    validate: true
+  publish:
     image: plugins/s3:1
     bucket: packetfire
     strip_prefix: public/
+    acl: public
     source: public/*
     target: /
     endpoint: https://nyc3.digitaloceanspaces.com
