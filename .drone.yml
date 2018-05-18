@@ -1,8 +1,12 @@
+workspace:
+  base: /work
+
 pipeline: 
   render:
-    image: cbrgm/drone-hugo:latest
-    output: public/
-    validate: true
+    image: ncatelli/hugo_builder:v0.29 
+    pull: true
+    commands:
+      - /usr/local/bin/hugo
   publish:
     image: plugins/s3:1
     bucket: packetfire
