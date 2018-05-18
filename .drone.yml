@@ -4,11 +4,10 @@ pipeline:
     pull: true
     commands:
       - /usr/local/bin/hugo
-  publish:
+  s3:
     image: plugins/s3:1
     bucket: packetfire
     strip_prefix: public/
-    acl: public
     source: public/**
     target: /
     endpoint: https://nyc3.digitaloceanspaces.com
