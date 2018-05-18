@@ -5,7 +5,7 @@ pipeline:
     commands:
       - /usr/local/bin/hugo
   s3:
-    image: plugins/s3
+    image: plugins/s3:1
     bucket: packetfire
     strip_prefix: public/
     source: public/*
