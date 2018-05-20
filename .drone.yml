@@ -7,10 +7,7 @@ pipeline:
   s3-sync:
     image: plugins/s3-sync:1
     bucket: packetfire
-    access_key: a50d28f4dd477bc184fbd10b376de753
-    secret_key: bc5785d3ece6a9cdefa42eb99b58986f9095ff1c
     region: us-east-1
-    source: public/**/*
-    target: /
+    source: public/
     delete: true
     secrets: [ aws_access_key_id, aws_secret_access_key ]
