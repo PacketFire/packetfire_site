@@ -11,6 +11,8 @@ pipeline:
     region: us-east-1
     source: public/
     delete: true
+    acl:
+      '/**/*': public-read
     secrets: [ aws_access_key_id, aws_secret_access_key ]
     when:
       event: push
@@ -24,4 +26,3 @@ pipeline:
     when:
       event: push
       branch: master
-
