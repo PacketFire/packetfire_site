@@ -2,10 +2,10 @@ services:
   - docker
 
 env:
-  HUGO_BUILD_VERSION: "v0.29"
+  HUGO_IMAGE: 'ncatelli/hugo_builder:v0.29'
 
 before_install:
-  - docker pull ncatelli/hugo_builder:$HUGO_BUILD_VERSION
+  - docker pull $HUGO_IMAGE
   - apt-get install -y curl
 
 jobs:
