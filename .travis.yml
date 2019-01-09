@@ -1,0 +1,31 @@
+services:
+  - docker
+
+env:
+  HUGO_IMAGE: 'ncatelli/hugo_builder:v0.29'
+
+before_install:
+  - docker pull $HUGO_IMAGE
+  - apt-get install -y curl
+
+jobs:
+  include:
+    - stage: "Build and Deploy"
+      script:
+      - docker run --rm -v $PWD:/work -w /work ncatelli/hugo_builder:$HUGO_BUILD_VERSION /usr/local/bin/hugo
+      deploy:
+        provider: s3
+        access_key_id: $AWS_ACCESS_KEY_ID
+        secret_access_key: $AWS_SECRET_KEY
+        bucket: packetfire
+        region: us-east-1
+        local_dir: public
+        skip_cleanup: true
+        acl: public_read
+        on:
+          branch: master
+    - stage: "Clear Cache" 
+      - name: "Clear beluga cache."
+        script: 'curl -kH "Content-type: application/json" -H "Accept: application/json" -d "{\"urls\": [{\"url\": \"http://www.packetfire.org/*\"}]}" "$WEBHOOK_URLS" -u "$WEBHOOK_USERNAME:$WEBHOOK_PASSWORD" -s'
+        on:
+          branch: master
