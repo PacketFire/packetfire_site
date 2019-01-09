@@ -1,3 +1,4 @@
+sudo: true
 services:
   - docker
 
@@ -6,13 +7,13 @@ env:
 
 before_install:
   - docker pull $HUGO_IMAGE
-  - apt-get install -y curl
+  - sudo apt-get install -y curl
 
 stages:
   - name: 'Build and Deploy'
   - name: 'Clear Cache'
     if: branch = master
-    
+
 jobs:
   include:
     - stage: "Build and Deploy"
