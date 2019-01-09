@@ -11,8 +11,7 @@ before_install:
 jobs:
   include:
     - stage: "Build and Deploy"
-      script:
-      - docker run --rm -v $PWD:/work -w /work ncatelli/hugo_builder:$HUGO_BUILD_VERSION /usr/local/bin/hugo
+      script: docker run --rm -v $PWD:/work -w /work ncatelli/hugo_builder:$HUGO_BUILD_VERSION /usr/local/bin/hugo
       deploy:
         provider: s3
         access_key_id: $AWS_ACCESS_KEY_ID
