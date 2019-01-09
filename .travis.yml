@@ -1,3 +1,5 @@
+language: generic
+sudo: true
 services:
   - docker
 
@@ -6,13 +8,17 @@ env:
 
 before_install:
   - docker pull $HUGO_IMAGE
-  - apt-get install -y curl
+  - sudo apt-get install -y curl
+
+stages:
+  - name: 'Build and Deploy'
+  - name: 'Clear Cache'
+    if: branch = master
 
 jobs:
   include:
     - stage: "Build and Deploy"
-      script:
-      - docker run --rm -v $PWD:/work -w /work ncatelli/hugo_builder:$HUGO_BUILD_VERSION /usr/local/bin/hugo
+      script: docker run --rm -v $PWD:/work -w /work $HUGO_IMAGE /usr/local/bin/hugo
       deploy:
         provider: s3
         access_key_id: $AWS_ACCESS_KEY_ID
@@ -25,7 +31,7 @@ jobs:
         on:
           branch: master
     - stage: "Clear Cache" 
-      - name: "Clear beluga cache."
-        script: 'curl -kH "Content-type: application/json" -H "Accept: application/json" -d "{\"urls\": [{\"url\": \"http://www.packetfire.org/*\"}]}" "$WEBHOOK_URLS" -u "$WEBHOOK_USERNAME:$WEBHOOK_PASSWORD" -s'
-        on:
-          branch: master
+      name: "Clear beluga cache."
+      script: 'curl -kH "Content-type: application/json" -H "Accept: application/json" -d "{\"urls\": [{\"url\": \"http://www.packetfire.org/*\"}]}" "$WEBHOOK_URLS" -u "$WEBHOOK_USERNAME:$WEBHOOK_PASSWORD" -s'
+      on:
+        branch: master
