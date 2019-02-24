@@ -13,7 +13,7 @@ before_install:
 stages:
   - name: 'Build and Deploy'
   - name: 'Clear Cache'
-    if: branch = master
+    if: branch = master AND type = push
 
 jobs:
   include:
