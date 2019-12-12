@@ -4,10 +4,13 @@ services:
   - docker
 
 env:
-  HUGO_IMAGE: 'ncatelli/hugo_builder:v0.29'
+  HUGO_IMAGE: 'hugo_builder'
+  HUGO_VERSION: '0.29'
 
 before_install:
-  - docker pull $HUGO_IMAGE
+  - pushd scripts/hugo_builder/
+  - docker build -t $HUGO_IMAGE .
+  - popd
   - sudo apt-get install -y curl
 
 stages:
@@ -18,7 +21,7 @@ stages:
 jobs:
   include:
     - stage: "Build and Deploy"
-      script: docker run --rm -v $PWD:/work -w /work $HUGO_IMAGE /usr/local/bin/hugo
+      script: docker run --rm -e HUGO_VERSION -v $PWD:/data -w /data $HUGO_IMAGE
       deploy:
         provider: s3
         access_key_id: $AWS_ACCESS_KEY_ID
