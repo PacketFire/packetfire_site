@@ -1,6 +1,6 @@
 ---
 title: "Using Makefiles with Go"
-date: 2017-11-01T00:00:00-00:00
+date: 2019-12-11T00:00:00-00:00
 author: "Nate Catelli"
 tags: ["make", "golang"]
 description: "Using make to wrap golang with extra functionality."
@@ -12,24 +12,50 @@ draft: false
 One of my favorite features of golang is its simple toolchain for builds. However at times, I've wished that I could easily add tasks to a build step. Using GNU Make, I've found that I can quickly and easily wrap the go toolchain in a consistent way that leaves plenty of room for customization.
 
 ### Wrapping Common Go Commands:
-Primarily I leverage four of the go toolchain's subcommands more than anything else and I begin by defining these subcommands in my Makefile.
+Primarily, I've been able to get away with 1:1 mapping of many of the go tool chain directly behind corresponding make commands.
 
-The fmt command is mostly a copy paste of the corresponding go command. with test being is where we leverage one small feature of make, chaining blocks. This allows us to insure that our package is linted prior to running our tests. Finally I also typically implement a block to render the documentation into a README.md.
+The `fmt` command is mostly a copy paste of the corresponding go command. However, by leveraging some core functionality within make, we are able to begin defining dependency chains in other steps that allow us to insure that code is formatted, linted and tested prior to builds.
 
 ```
+APP_NAME=examplepkg
+IMG_NAME="ncatelli/examplepkg"
 PKG="github.com/ncatelli/examplepkg"
 
-build: | test
-  go build $(PKG)
+build: | fmt lint test
+	go build
+
+build-docker: | fmt lint test
+	docker build -t ${IMG_NAME}:latest .
+
+test:
+	go test -race -cover ./...
 
 fmt:
-  go fmt $(PKG)
+	test -z $(shell go fmt ./...)
 
-test: | fmt
-  go test $(PKG)
+clean-docker:
+	@type docker >/dev/null 2>&1 && \
+	docker rmi -f ${IMG_NAME}:latest || \
+	true
 
-doc:
-  godoc $(PKG) > $(GOPATH)/src/$(PKG)/README.md
+clean: clean-docker
+	@rm -f ${APP_NAME} || true
+
+lint:
+	golint -set_exit_status ./...
+```
+
+### Leveraging go modules
+By leveraging go modules, we can also insure that each build will have the required dependencies for our toolchain, an example being the golint command as can be seen in the below example `go.mod` file.
+
+```
+module github.com/ncatelli/examplepkg
+
+require (
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
+)
+
+go 1.13
 ```
 
 ### Use With cGo:
