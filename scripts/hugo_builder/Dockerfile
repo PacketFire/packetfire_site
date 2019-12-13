@@ -1,4 +1,4 @@
-FROM debian:9
+FROM debian:10
 
 LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
 LABEL description="The hugo build environment for the packetfire site."
