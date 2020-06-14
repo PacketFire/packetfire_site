@@ -1,6 +1,6 @@
 ---
 title: "Intro to BGP with BIRD"
-date: 2020-07-13T13:43:28-04:00
+date: 2020-06-13T13:43:28-04:00
 author: "Nate Catelli"
 tags: ["networking"]
 description: "An introductory tutorial on BGP using BIRD and docker."
@@ -13,10 +13,11 @@ Border Gateway Protocol (BGP) is one of the core technologies involved in making
 
 By the end of this tutorial, you will be familiar with the core concepts of BGP and have the proper vocabulary to communicate this to another network engineer. You will also be able to use a userland routing daemon, BIRD, to establish peering sessions and begin announcing routes.
 
-I plan to achieve this using a virtualized docker playground which can be downloaded [here](https://github.com/ncatelli/bird_examples.git). In order to complete this tutorial you will need to ensure you have docker and docker-compose installed.
+I plan to achieve this using a virtualized docker playground which can be downloaded [here](https://github.com/ncatelli/bird_examples_docker.git)
+. In order to complete this tutorial you will need to ensure you have docker and docker-compose installed.
 
 ### Setup:
-To begin, you will need to clone the repo and all submodules of the [bird_examples](https://github.com/ncatelli/bird_examples.git) project.
+To begin, you will need to clone the repo of the [bird_examples_docker](https://github.com/ncatelli/bird_examples_docker.git) project.
 
 ```bash
 ncatelli@ofet> git clone https://github.com/ncatelli/bird_examples_docker.git
