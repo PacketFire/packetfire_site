@@ -55,7 +55,7 @@ While BGP is considered an exterior gateway protocol that is used for routing be
 BIRD is a fully-functional routing daemon that supports many different routing protocols, including BGP. BIRD provides a simple configuration format and command line utility for interacting with sessions. BIRD also comes with built-in support for both IPv4 and IPv6 and the respective tools to work with both protocols. 
 
 #### Examining Sessions:
-Similiar to how we verified that our vagrant environment was provisioned properly, we can view running sessions by running:
+Similiar to how we verified that our docker environment was provisioned properly, we can view running sessions by running:
 
 ```bash
 root@peer1:/# birdc show protocols
