@@ -21,7 +21,7 @@ To begin, you will need to clone the repo of the [bird_examples_docker](https://
 
 ```bash
 ncatelli@ofet> git clone https://github.com/ncatelli/bird_examples_docker.git
-ncatelli@ofet> cd bird_examples
+ncatelli@ofet> cd bird_examples_docker
 ncatelli@ofet> docker-compose up -d
 ```
 
