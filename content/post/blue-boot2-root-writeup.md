@@ -9,7 +9,7 @@ draft: false
 ---
 
 ### Introduction:
-After participating in the Disney Can-You-Hack-It CTF, I've recently been trying to spend more of my time studying security concepts and offensive penetration testing. Through these studies, I've been trying to understand an attack by both performing the attack with and without the assistance of a framework like metasploit. This post is meant to be the first of many as I attempt to practice documenting both the attack and my methodology.
+After participating in the Disney Can-You-Hack-It CTF, I've been trying to spend more of my time studying security and offensive penetration testing. Primarily, I've been trying to balance both understanding how to effectively perform an attack with the awesome frameworks out their like metasploit, but also gain a better understanding of what this framework is doing under the hood. This post is meant to be the first of many as I attempt to practice documenting both the attack and my methodology.
 
 ### Environment
 Both attacks are taking place in a fairly flat network consisting of my attack host, a fresh booted livecd of Kali Linux, and the the target host, a freshly booted Windows VM that I knew contained 3 flags to capture.. No other information is known about the host, what it's running or it's OS versioning, however I would be lying if I said I didn't assume that this would be an eternalblue attack based off the name.
