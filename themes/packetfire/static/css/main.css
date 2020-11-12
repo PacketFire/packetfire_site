@@ -16,10 +16,15 @@ main {
     max-width: 750px;
 }
 
+img {
+    max-width: 700px;
+}
+
 /*footer*/
 
 .copyright {
     margin: 15px 0;
+    text-align: center;
 }
 
 /*home page*/
