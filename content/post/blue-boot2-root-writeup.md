@@ -686,7 +686,7 @@ Use the "--show --format=NT" options to display all of the cracked passwords rel
 Session completed
 ```
 
-#### Wrapping Up
+### Wrapping Up
 With the credentials in hand I decided to try my had at a remote desktop session. Which happily gave me access to a desktop.
 
 ```bash
@@ -695,5 +695,5 @@ root@kali:~# rdesktop -u Jon 10.10.87.38
 
 ![Jon's PC](/img/blue_boot2root_jon_pc.png)
 
-### Summary
+## Summary
 This attack really hammered in how simple metasploit makes some of the more tedious tasks. Not only sourcing and packing an exploit but in things like capturing the outputs of scans, handling setting up listeners to catch shells and the myriad of benefits meterpreter provides in stabalizing a shell, transfering files and pivoting. Despite all that, it was massively educational to be forced to read the exploit I was attempting to understand how to prepare it for use and it was fun attempting to pivot with only the resources I had available in the limited shell. 
