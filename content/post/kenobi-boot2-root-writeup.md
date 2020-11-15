@@ -265,5 +265,4 @@ root.txt
 ```
 
 ## Summary
-This 
-
+This attack ended up reinforcing how much care needs to be taken when reading through any information found. There were mountains of information made available in scans and files laying around that, if they weren't reiterated as often as they were, could have easily been missed. A perfect example of this is my entirely missing the NFS server listening on port 111, that I didn't catch until a second pass through on this host.
