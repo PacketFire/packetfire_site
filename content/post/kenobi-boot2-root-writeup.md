@@ -9,16 +9,16 @@ draft: false
 ---
 
 ## Introduction:
-The Kenobi boot2root was a ton of fun because it required multiple pivots to learn enough to leak a key. On my first pass i ended up overlooking the NFS shares which really impressed the importance of carefully reviewing the scans.
+The Kenobi boot2root challenge was a ton of fun because it required multiple pivots to learn enough to leak a key. On my first pass I overlooked the NFS server which really impressed the importance of carefully reviewing scans.
 
 ## Environment
-The attack take place on a flat network consisting of my attack host, which is a freshly-booted Kali Linux livecd, and the the target host, a freshly-booted Linux VM that I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack.
+The attack take place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host which I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack other than that the host was most likely a Linux server.
 
 ## Attacking Kenobi
-Given that I knew I would be attacking a single target, I exported the host's IP as the environment variable `ATTACKTARGET`. I've also simplified a few scans for the single host case by doing things like disabling pings.
+Since I knew I would be attacking a single target, I exported the host's IP to the environment variable `ATTACKTARGET`. I've also modified a few scans for the single host case by doing things such as disabling pings.
 
 ### Host Enumeration
-I started the attack by opening up a new tmux session and starting a few nmap scans to determine the lay of the land, initially starting with a SYN, OS and Service Version scan.
+I began the attack by opening up a new tmux session and starting a few nmap scans to get a feel for the lay of the land. I started with a SYN, OS and Service Version scan.
 
 ```
 root@kali:~# mkdir scans
@@ -53,7 +53,7 @@ OS:R=Y%DFI=N%T=40%CD=S)
 Network Distance: 1 hop
 Service Info: Host: KENOBI; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
 
-OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/.
 Nmap done: 1 IP address (1 host up) scanned in 25.27 second
 ```
 
@@ -65,7 +65,7 @@ I tried a few different URLs for fun and ended up getting lucky with `robots.txt
 
 ![Kenobi site admin](/img/kenobi_http_admin.png)
 
-Give that there were a few other targets, I decided to look into those before enumarating the webserver further. Samba seemed like a reasonable next choice and I began by enumarating both shares and users using two of the smb scripts provided with nmap.
+Given that there were a few other targets, I decided to look into those before enumerating the webserver further. Samba seemed like a reasonable next choice and I began by enumarating both shares and users using two of the smb scripts provided with nmap.
 
 ```
 root@kali:~/scans# nmap --script=smb-enum-shares.nse,smb-enum-users.nse -p 445 -oA smb $ATTACKTARGET 
@@ -109,7 +109,7 @@ Host script results:
 Nmap done: 1 IP address (1 host up) scanned in 0.58 second
 ```
 
-This ended up exposing a potential `kenobi` user as well as identifying an anonyous share. I connected to this share and was happy to find a `logs.txt` file that ended up being a gold mine. leaking not only that `kenobi` was a user but a path to an ssh key. This also contained a, presumably up-to-date, copy of the smb config file that pointed to where the users home directory and the samba share was.
+This scan exposed a potential `kenobi` user and also identified an anonymous share. I connected to that share and was delighted to find a `logs.txt` file that turned out to be a gold mine, exposing the `kenobi` user and a path to an SSH key. This also contained a possibly up-to-date copy of the samba config file that pointed to where the users home directory and the samba share was.
 
 ```
 smb: \> get log.txt 
@@ -142,7 +142,7 @@ root@kali:~# mkdir exploit && cd exploit/
 ```
 
 ### Preparing an attack
-This exploit allowed for the arbitrary copy of files around on the filesystem and given I had a few points of exfiltration and a key, seemed worth investigating. The second option in the list included a python exploit that I decided to modify to allow me to provide a source and destination argument for my copy. Which I then called to attempt to move the `kenobi` user's ssh key into the samba share.
+This exploit allowed me to arbitrarily copy files around on the filesystem. Since I had a key and a few points of exfiltration, it seemed worth investigating. The second option in the list, exploit `36803`, included a python script that I modified to accept a source and destination argument. I then used the exploit to move the `kenobi` user's ssh key into the samba share. I've included the script below.
 
 ```python
 import socket
@@ -209,7 +209,7 @@ kenobi@kenobi:~$
 Success! I had a local account on the host!
 
 #### Escalating privileges
-I began to poke around on the host and managed to find a flag `user.txt` sitting right in kenobi's home directory. I ran through my usual CTF local enumeration steps including checking the host version, checking for sudo privs, etc... when I noticed a binary I wasn't familiar when checking for files with SUID bits. I've truncated the output a bit for clarity.
+I began to poke around on the host and managed to find a flag `user.txt` sitting right in kenobi's home directory. I followed my usual CTF local enumerating steps, which included checking the host version, sudo privs, etc. I noticed a binary I wasn't familiar with when checking for files with the SUID bits. I've truncated the output a bit for clarity.
 
 ```
 kenobi@kenobi:~$ find / -perm -4000 -type f 2>/dev/null
@@ -236,7 +236,7 @@ curl -I localhost
 uname -r
 ```
 
-With this information I decided to try a PATH hijacking attack by creating an executable binary in the kenobi user's local path containing a call to bash. I then overrode the kenobi user's local path to check this local path first and attempted to rerun the kernel version `menu` check again.
+With this information I decided to try a PATH hijacking attack by creating an executable binary in the kenobi user's local path which, when ran, would invoke `/bin/bash`. I then overrode the kenobi user's path to put its local `~/bin` at a higher priority and attempted to rerun the kernel version `menu` command again.
 
 ```
 kenobi@kenobi:~$ mkdir bin
@@ -256,7 +256,7 @@ See "man sudo_root" for details.
 root@kenobi:~# 
 ```
 
-Success! This elevated me to root permissions and quickly I found the last flag sitting in the `/root/` directory.
+Success! This elevated me to a root shell and quickly I found the last flag sitting in the `/root/` directory.
 
 ```
 root@kenobi:/# cd /root/
@@ -265,4 +265,4 @@ root.txt
 ```
 
 ## Summary
-This attack ended up reinforcing how much care needs to be taken when reading through any information found. There were mountains of information made available in scans and files laying around that, if they weren't reiterated as often as they were, could have easily been missed. A perfect example of this is my entirely missing the NFS server listening on port 111, that I didn't catch until a second pass through on this host.
+This attack reinforced how much discipline is necessary when reading through exfiltrated information. There were mountains of information made available in scans and files laying around that, if they weren't reiterated as often as they were, could have easily been missed. A perfect example of this is how I missed the NFS server listening on port 111, which I only found on my second pass through the host.
