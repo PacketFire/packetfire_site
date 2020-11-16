@@ -57,7 +57,7 @@ OS and Service detection performed. Please report any incorrect results at https
 Nmap done: 1 IP address (1 host up) scanned in 25.27 second
 ```
 
-This scan immediately told me a ton about the host. It appeared to be an Ubuntu linux distro, running samba, proftpd and a webserver. This meant there were a ton of paths to begin investigating. Given the low barrier to entry I started by opening firefox to see what the website it was serving looked like.
+This scan uncovered a great deal of information about the host. It appeared to be an Ubuntu linux distro, running sambda, proftpd, and a webserver, each of which represented a viable path for investigation. I started by opening firefox to see what the website it was serving looked like.
 
 ![Kenobi site index](/img/kenobi_http_index.png)
 
