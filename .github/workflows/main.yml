@@ -11,6 +11,7 @@ jobs:
         uses: ./.github/actions/hugo_builder
         with:
           hugo_version: "0.73.0"
+          hugo_command: "--minify"
       - name: Copy Public Directory to S3
         if: github.ref == 'refs/heads/master'
         uses: jakejarvis/s3-sync-action@v0.5.0
