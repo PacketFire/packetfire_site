@@ -9,10 +9,10 @@ draft: false
 ---
 
 ## Introduction:
-The Kenobi boot2root challenge was a ton of fun because it required multiple pivots to learn enough to leak a key. On my first pass I overlooked the NFS server which really impressed the importance of carefully reviewing scans.
+The Kenobi boot2root challenge was a ton of fun because it required multiple pivots to learn enough to leak a key. On my first pass, I overlooked the NFS server which really impressed the importance of carefully reviewing scans.
 
 ## Environment
-The attack take place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host which I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack other than that the host was most likely a Linux server.
+The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host which I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack other than that the host was most likely a Linux server.
 
 ## Attacking Kenobi
 Since I knew I would be attacking a single target, I exported the host's IP to the environment variable `ATTACKTARGET`. I've also modified a few scans for the single host case by doing things such as disabling pings.
@@ -65,7 +65,7 @@ I tried a few different URLs for fun and ended up getting lucky with `robots.txt
 
 ![Kenobi site admin](/img/kenobi_http_admin.png)
 
-Given that there were a few other targets, I decided to look into those before enumerating the webserver further. Samba seemed like a reasonable next choice and I began by enumarating both shares and users using two of the smb scripts provided with nmap.
+Given that there were a few other targets, I decided to look into those before enumerating the webserver further. Samba seemed like a reasonable next choice and I began by enumerating both shares and users using two of the smb scripts provided with nmap.
 
 ```
 root@kali:~/scans# nmap --script=smb-enum-shares.nse,smb-enum-users.nse -p 445 -oA smb $ATTACKTARGET 
@@ -109,7 +109,7 @@ Host script results:
 Nmap done: 1 IP address (1 host up) scanned in 0.58 second
 ```
 
-This scan exposed a potential `kenobi` user and also identified an anonymous share. I connected to that share and was delighted to find a `logs.txt` file that turned out to be a gold mine, exposing the `kenobi` user and a path to an SSH key. This also contained a possibly up-to-date copy of the samba config file that pointed to where the users home directory and the samba share was.
+This scan exposed a potential `kenobi` user and also identified an anonymous share. I connected to that share and was lucky to find a `logs.txt` file that turned out to be a gold mine, exposing the `kenobi` user and a path to an SSH key. This also contained a possibly up-to-date copy of the samba config file that pointed to where the users home directory and the samba share were.
 
 ```
 smb: \> get log.txt 
@@ -131,7 +131,7 @@ root@kali:~# cat log.txt | grep '\[anonymous\]' -A5
    guest ok = yes
 ```
 
-Finally, I decided to probe around on the FTP server, which didn't appear to have anonymous logins. With a few services, a bit of a map of the environment and some service versions in hand, I ran a few search queries through `searchsploit` before landing on the following exploit for `ProFTPd 1.3.5`.
+Finally, I decided to probe around on the FTP server, which didn't appear to have anonymous logins. With a few services, a bit of a map of the environment and some service versions in hand, I ran a few search queries through `searchsploit` before landing on the following exploits for `ProFTPd 1.3.5`.
 
 ```
 root@kali:~# searchsploit 1.3.5 -w | grep -i proftpd 
@@ -142,7 +142,7 @@ root@kali:~# mkdir exploit && cd exploit/
 ```
 
 ### Preparing an attack
-This exploit allowed me to arbitrarily copy files around on the filesystem. Since I had a key and a few points of exfiltration, it seemed worth investigating. The second option in the list, exploit `36803`, included a python script that I modified to accept a source and destination argument. I then used the exploit to move the `kenobi` user's ssh key into the samba share. I've included the script below.
+These exploits allowed me to arbitrarily copy files around on the filesystem. Since I had a key and a few points of exfiltration, it seemed worth attempting. The second option in the list, exploit `36803`, included a python script that I modified to accept a source and destination argument. I then used the exploit to move the `kenobi` user's ssh key into the samba share. I've included the modified script below.
 
 ```python
 import socket
@@ -209,7 +209,7 @@ kenobi@kenobi:~$
 Success! I had a local account on the host!
 
 #### Escalating privileges
-I began to poke around on the host and managed to find a flag `user.txt` sitting right in kenobi's home directory. I followed my usual CTF local enumerating steps, which included checking the host version, sudo privs, etc. I noticed a binary I wasn't familiar with when checking for files with the SUID bits. I've truncated the output a bit for clarity.
+I began to poke around on the host and managed to find a flag `user.txt` sitting in kenobi's home directory. I followed my usual CTF local enumerating steps, which included checking the host version, sudo privs, etc... when I'd noticed a binary I wasn't familiar with when checking for files with the SUID bits set. I've truncated the output a bit for clarity.
 
 ```
 kenobi@kenobi:~$ find / -perm -4000 -type f 2>/dev/null
@@ -220,7 +220,7 @@ kenobi@kenobi:~$ find / -perm -4000 -type f 2>/dev/null
 /bin/ping6
 ```
 
-Running this `menu` command prompted for an option and output a status check of the site, network configuration information or the kernel version. I then fed the command through strings to validate that it was shelling out to another command and was pleased to see it called out to both `curl` and `uname`.
+Running this `menu` command prompted for an option and then output a corresponding status check of the site, network configuration information or the kernel version. I then fed the command through strings to validate that it was shelling out and was pleased to find that it called out to both `curl` and `uname`.
 
 ```
 kenobi@kenobi:~$ /usr/bin/menu
@@ -236,7 +236,7 @@ curl -I localhost
 uname -r
 ```
 
-With this information I decided to try a PATH hijacking attack by creating an executable binary in the kenobi user's local path which, when ran, would invoke `/bin/bash`. I then overrode the kenobi user's path to put its local `~/bin` at a higher priority and attempted to rerun the kernel version `menu` command again.
+With this information I decided to try a PATH hijacking attack by creating an executable binary in the kenobi user's local path which, when ran, would invoke `/bin/bash`. I then overrode the kenobi user's PATH to place its local `~/bin/` directory at the highest priority and attempted to rerun the kernel version `menu` command again.
 
 ```
 kenobi@kenobi:~$ mkdir bin
