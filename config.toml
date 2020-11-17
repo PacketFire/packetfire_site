@@ -38,12 +38,6 @@ theme = "packetfire"
     name = "About"
     weight = 4
 
-
-[[menu.icon]]
-    url = "https://discord.gg/jJV7ANw"
-    name = "commenting-o"
-    weight = 1
-
 [[menu.icon]]
     url = "mailto:ncatelli@packetfire.org"
     name = "envelope-o"
