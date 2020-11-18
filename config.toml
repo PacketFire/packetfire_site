@@ -1,4 +1,4 @@
-baseURL = "http://packetfire.org"
+baseURL = "https://packetfire.org"
 languageCode = "en-us"
 title = "Packetfire"
 theme = "packetfire"
