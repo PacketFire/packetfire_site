@@ -9,13 +9,13 @@ draft: false
 ---
 
 ## Introduction:
-The Daily Bugle challenge was exceptionally difficult compared to a few of the other hosts I've attacked in the past. Not specifically for any technical reason but it provided many opportunities to rabbithole if I wasn't dilligent in both thinking about how I looked for information but also in what I documented. I will attempt to call out the points that I really rabbitholed on but I think it will be very difficult to express in written form.
+The Daily Bugle challenge was exceptionally difficult compared to challenges that I've attempted in the past. It was incredibly easy to rabbithole down paths if I wasn't diligent both in thinking about how to collect information but in documenting the information that I had gathered. In this post, I'll talk through my experience in tackling this challenge and especially focus on the rabbitholes I fell victim to, however it may be difficult to fully capture the amount of time spent in these in writing.
 
 ## Environment
-The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host. I knew very little about the host prior to the attack other than that there would be two flags on the host, a user and root flag.
+The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target host. I was given hardly any information about the host other than that there would be two flags on the host, a user and root flag.
 
 ## Attack 
-Prior to starting initial recon, I opened up a metasploit console and connected it to the msfdb postgres backend to gather any information that I had found into a single point. I also had setup burp suite to run on port 8080 and configured the local CA in Firefox. Finally I installed gobuster and seclists in anticipation of any enumeration I might need to do. I'm looking forward to these being included with Kali though I really only uses them for personal preference reasons.
+Prior to starting initial recon, I opened up a metasploit console and connected it to the msfdb postgres backend to gather any information that I had found into a single point. I also had set up burp suite to run on port 8080 and configured the local CA in Firefox. Finally I installed gobuster and seclists in anticipation of any enumeration I might need to do. I'm looking forward to these being included with Kali though I really only uses them for personal preference reasons.
 
 ### Host enumeration
 After this initial setup, I started with a SYN, OS and Version scan of the host to attempt to identify at a high level what I was looking at.
