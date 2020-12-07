@@ -9,16 +9,16 @@ draft: false
 ---
 
 ## Introduction:
-The Internal host took almost 24 hours to complete due to the sheer number of pivots required to complete it. Unlike many of the other boot2roots I've completed on THM, this host required a significant amount of review and manual poking around on the host above and beyond the results of automated enumeration tools like linPEAS. I enjoyed this host immensely and I thought it was incredibly brilliant machine. 
+The Internal host took almost 24 hours to complete due to the sheer number of pivots required to complete it. Unlike many of the other boot2roots I've completed on THM, this host required a significant amount of review and manual poking around on the host, above and beyond the results of automated enumeration tools like linPEAS. I thought it was incredibly brilliant machine. 
 
 ## Environment
-The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target host. Information about the host was extremely limited other than that there would be two flags available corresponding to a user and root flag. It was also known that the host contained a web application, and that the host, known by the domain internal.thm, was the only host in scope.
+The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target host. Information about the host was limited, however, I knew there would be two flags a user and root flag. It was also known that the host, known by the domain internal.thm, hosted a webserver and was the only host in scope.
 
 ## Attack 
 Prior to starting the attack, I prepared my workstation by setting up burpsuite, installing the certificates in firefox and defining the scope to include only the target host. I also opened msfconsole and configured it to connect to a postgres backend of msfdb. I also installed `jq`, [gobuster](https://github.com/OJ/gobuster) and the [seclists](https://github.com/danielmiessler/SecLists) wordlist collections. Finally I added `internal.thm` to my hosts file mapped to the target IP per the provide scope document.
 
 ### Host enumeration
-I started the attack by running an SYN and version and OS scan against the host which identified only 2 listening ports on ssh and http while also confirming that this host was running linux.
+I started the attack by running SYN version and OS scans against the host which identified only 2 open ports for ssh and http, and also confirming that this host was running linux.
 
 ```
 msf5 > db_nmap -sS -sV -O 10.10.215.86
@@ -48,7 +48,7 @@ msf5 > db_nmap -sS -sV -O 10.10.215.86
 [*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 20.94 seconds
 ```
 
-To confirm that there was nothing else running on hidden ports, I ran a broader scan against all 65535 ports. Yet, I found that it returned nothing more that the above and have omitted the results for that reason.
+To confirm that there was nothing else running on hidden ports, I ran a broader scan against all 65535 ports. I found that it returned nothing more that the above and have omitted the results for that reason.
 
 ### Investigating the webserver
 I then decided to move to the webserver and, after opening up the site index, found that I was given the default apache page for ubuntu.
@@ -82,14 +82,14 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 ===============================================================
 ```
 
-I was lucky to find what looked like two potential paths forward, a blog running wordpress and a phpmyadmin panel. I decided to take the happy path aproach and have a look at the blog to start.
+I was lucky to find what looked like two potential paths forward, a blog running wordpress and a phpmyadmin panel. I decided to take the happy path aoproach and have a look at the blog to start.
 
 ### Investigating the wordpress blog
 The wordpress blog appeared pretty bog-standard after opening the page, looking to be nothing more than a default install of wordpress.
 
 ![wordpress index](/img/internal_http_blog_index.png)
 
-I browsed to a few common wordpress endpoints to confirm that it was that CMS and then chose to run `wpscan` against it to see if anything significant jumped out at me. Quickly the scan identified that this was wordpress `5.4.2` but gave little else that was actionable for the attack.
+I browsed to a few common wordpress endpoints to confirm that it was that CMS and then chose to run `wpscan` against it to see if anything significant jumped out at me. Soon after, the scan identified that this was wordpress `5.4.2` but gave little else that was actionable for the attack.
 
 With the scan turning up little, I decided to attempt to pull user information from the wordpress api endpoint before looking at other vectors.
 
@@ -150,7 +150,7 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2020-12-05 05:17:
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2020-12-05 05:19:49
 ```
 
-By the time I'd had returned I found that the bruteforce had yielded the password `my2boys` which I was able to confirm allowed me access to the admin panel.
+By the time I'd returned the bruteforce had yielded the password `my2boys` which I was able to confirm allowed me access to the admin panel.
 
 ![wordpress admin panel](/img/internal_http_wp_admin.png)
 
@@ -302,7 +302,7 @@ aubrean+  1540  0.5 12.1 2587808 248012 ?      Sl   04:08   0:27 java -Duser.hom
 message+   909  0.0  0.2  50060  4664 ?        Ss   04:08   0:00 /usr/bin/dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-onlyql     1099  0.2 11.2 1165848 229308 ?      Sl   04:08   0:14 /usr/sbin/mysqld --daemonize --pid-file=/run/mysqld/mysqld.pid
 ```
 
-I decided to take a look in the `/var/jenkins_home/` directory to see if I could find any configuration for the jenkins host but found that it didn't exist, giving credence to it running in a docker container. I similarly looked under `/etc/` and found nothing related to jenkins, finally I looked under `/opt/` and stumbled on a `/opt/wp-save.txt` file that netted a set of credentialls for the `aubreanna` user.
+I decided to take a look in the `/var/jenkins_home/` directory to see if I could find any configuration for the jenkins host but found that it didn't exist, leading me to believe it running in a docker container. Similarly, I looked under `/etc/` and found nothing related to jenkins, finally I looked under `/opt/` and stumbled on a `/opt/wp-save.txt` file that netted a set of credentialls for the `aubreanna` user.
 
 ```
 meterpreter > cd /opt
@@ -438,7 +438,7 @@ Use the "--show" option to display all of the cracked passwords reliably
 Session completed
 ```
 
-I validated I was was able to login with this new set of credentials and was pleased to access the jenkins admin panel.
+I validated I was able to login with this new set of credentials and was pleased to access the jenkins admin panel.
 
 ![jenkins admin](/img/internal_http_jenkins_admin.png)
 
@@ -540,4 +540,4 @@ root.txt  snap
 ```
 
 ## Summary
-I don't think this walk through effectively captures the amount of time that I'd spent poking around at each level of local enumeration. In my first run through, I'd spent a significant amount of time walking through directories externally on blog, internally in the blog's webroot as well as within the mysql database and phpmyadmin panels. This was repeated after popping a shell in the extensive time spent walking through service configurations and poking at the locally-bound services. It wasn't until I'd slowed down and started looking for out of place files that I'd stumbled on the `notes.txt` file in `/opt`. 
+I don't think this walkthrough faithfully captured the amount of time that I'd spent poking around at each level of local enumeration. In my first run through, I'd spent a significant amount of time walking through directories externally on blog, internally in the blog's webroot as well as within the mysql database and phpmyadmin panels. This was repeated after popping a shell in the extensive time spent walking through service configurations and poking at the locally-bound services. It wasn't until I'd slowed down and started looking for out of place files that I'd stumbled on the `notes.txt` file in `/opt`. 
