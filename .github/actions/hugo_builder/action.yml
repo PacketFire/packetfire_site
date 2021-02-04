@@ -5,7 +5,7 @@ inputs:
   hugo_version:
     description: The version of hugo to leverage in the build.
     required: true
-    default: '0.73.0'
+    default: '0.80.0'
   hugo_command:
     description: The hugo command to run.
     required: true

@@ -2,7 +2,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
 #-------------------------------------------------------------------------------------------------------------
-ARG HUGOVERSION='0.73.0'
+ARG HUGOVERSION='0.80.0'
 FROM debian:10
 
 LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
