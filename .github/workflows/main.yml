@@ -1,29 +1,32 @@
-name: Render and publish static site
-on: [push]
+name: github pages
+
+on:
+  push:
+    branches:
+      - master  # Set a branch to deploy
+  pull_request:
+
 jobs:
-  build:
-    name: render site with hugo
-    runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-20.04
     steps:
-      - name: Checkout Site Template
-        uses: actions/checkout@v1
-      - name: Render Hugo
-        uses: ./.github/actions/hugo_builder
+      - uses: actions/checkout@v2
         with:
-          hugo_version: "0.73.0"
-          hugo_command: "--minify"
-      - name: Copy Public Directory to S3
-        if: github.ref == 'refs/heads/master'
-        uses: jakejarvis/s3-sync-action@v0.5.0
+          submodules: true  # Fetch Hugo themes (true OR recursive)
+          fetch-depth: 0    # Fetch all history for .GitInfo and .Lastmod
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2
         with:
-          args: --acl public-read --follow-symlinks --delete
-        env:
-          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-          AWS_REGION: 'us-east-1'
-          SOURCE_DIR: 'public'
-      - name: Issue Invalidation To CDN
+          hugo-version: 'latest'
+          # extended: true
+
+      - name: Build
+        run: hugo --minify
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/master'
-        run: |
-          curl -kH "Content-type: application/json" -H "Accept: application/json" -d "{\"urls\": [{\"url\": \"http://www.packetfire.org/*\"}]}" ${{ secrets.WEBHOOK_ENDPOINT }} -u "${{ secrets.WEBHOOK_USERNAME }}:${{ secrets.WEBHOOK_PASSWORD }}" -s
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
