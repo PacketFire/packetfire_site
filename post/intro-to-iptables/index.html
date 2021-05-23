@@ -1,0 +1,149 @@
+<!doctype html><html lang=en-us><head><title>Intro to IPTables with Service-Based Firewalls</title><style>html body{font-family:Lato,sans-serif;background-color:#fff}:root{--accent:red;--border-width:5px}</style><link rel=stylesheet href=/css/main.css><link rel=stylesheet href="https://fonts.googleapis.com/css?family=Lato"><link rel=stylesheet href=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css integrity=sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u crossorigin=anonymous><link rel=stylesheet href=https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css integrity=sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN crossorigin=anonymous><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/go.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/kotlin.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/scala.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js></script><script src=//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/dockerfile.min.js></script><script>hljs.initHighlightingOnLoad()</script><script src=https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js></script><script src=https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js integrity=sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa crossorigin=anonymous></script><meta name=generator content="Hugo 0.83.1"><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta property="og:title" content="Intro to IPTables with Service-Based Firewalls"><meta property="og:url" content="https://packetfire.org/post/intro-to-iptables/"><meta property="og:description" content="An introductory tutorial to simple firewalls with iptables."><meta property="og:image" content="https://packetfire.org/img/pf-logo.png"><meta property="twitter:card" content="summary"><meta property="twitter:title" content="Intro to IPTables with Service-Based Firewalls"><meta property="twitter:description" content="An introductory tutorial to simple firewalls with iptables."><meta property="twitter:image" content="https://packetfire.org/img/pf-logo.png"></head><body><nav class="navbar navbar-default navbar-fixed-top"><div class=container><div class=navbar-header><a class="navbar-brand visible-xs" href=#>Intro to IPTables with Service-Based Firewalls</a>
+<button class=navbar-toggle data-target=.navbar-collapse data-toggle=collapse>
+<span class=icon-bar></span><span class=icon-bar></span><span class=icon-bar></span></button></div><div class="collapse navbar-collapse"><ul class="nav navbar-nav"><li><a href=/>Home</a></li><li><a href=/post/>Posts</a></li><li><a href=/project/>Projects</a></li><li><a href=/about/>About</a></li></ul><ul class="nav navbar-nav navbar-right"><li class=navbar-icon><a href=mailto:ncatelli@packetfire.org><i class="fa fa-envelope-o"></i></a></li></ul></div></div></nav><main><div class=item><h4><a href=/post/intro-to-iptables/>Intro to IPTables with Service-Based Firewalls</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>An introductory tutorial to simple firewalls with iptables.</h5><h5>September 7, 2017</h5><a href=https://packetfire.org/tags/networking><kbd class=item-tag>networking</kbd></a><a href=https://packetfire.org/tags/iptables><kbd class=item-tag>iptables</kbd></a></div><br><div class=text-justify><h3 id=introduction>Introduction:</h3><p>IPTables is a stateful firewall implemented via the netfilter kernel module. To many, learning iptables can be a daunting task, however when stuctured correctly an iptables firewall can be both simple to understand and easily automated. This tutorial will function as the first in a series of articles focused on firewalling with iptables.</p><p>In this tutorial, we will focus on creating a comprehensible firewall focused on filtering out traffic to the localhost. What this tutorial is not is a deep-dive into iptables, this will be reserved for later tutorials after you have become more comfortable working with the tool.</p><p>We will be using a Vagrant-based playground to complete this tutorial, you will need vagrant 1.6+, git and rsync installed.</p><h3 id=setup>Setup:</h3><p>To begin, you will need to clone the <a href=https://github.com/ncatelli/iptables_examples.git>iptables example repo</a>.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>ncatelli@ofet&gt; git clone https://github.com/ncatelli/iptables_examples.git
+ncatelli@ofet&gt; cd iptables_examples
+ncatelli@ofet&gt; vagrant up
+</code></pre></div><p>If everything worked you should be able to connect to the new environment with the following command:</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>ncatelli@ofet&gt; vagrant ssh node1
+Linux node1 4.9.0-3-amd64 <span style=color:#75715e>#1 SMP Debian 4.9.30-2+deb9u2 (2017-06-26) x86_64</span>
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms <span style=color:#66d9ef>for</span> each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+vagrant@node1:~$ sudo su -
+root@node1:~#
+</code></pre></div><p>From here we can verify that the we have an open firewall:</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+</code></pre></div><p>Don&rsquo;t worry if the output from the previous iptables command is unfamiliar to you. A quick intro to iptables will be provided in the next section.</p><h3 id=iptables>IPTables:</h3><p>To the user, IPTables exposes kernel-level packet filtering functionality via sequential rules. These rules are logically grouped within chains, allowing different rules to be evaluated based on described conditions. Chains are grouped into larger logical groups called tables. For now this tutorial, we will be focusing exclusively on the filter table and it is enough to understand that other tables exist and provide other functionality.</p><h4 id=filter-table>Filter table:</h4><p>The filter table is used for filtering packets to and from services on the localhost. This can be as simple as blocking access to all ports on a host from all new incoming requests while allowing outbound traffic to a server, or managing whitelists of IPs. However, complex behaviors can also be implemented within the filter table such as port knocking, rate-limiting and many other behaviors. For the purpose of this tutorial, we will attempt to build a firewall that is both powerful, yet simple to read and structured in a way that is conducive to automation. We will limit this to two services running on this host. SSH and HTTP. Let&rsquo;s begin by learning how we can look at the state of our filter table and learning how to read it.</p><p>We can view our filter table using the earlier <code>iptables -nL</code> command:</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+</code></pre></div><p>We&rsquo;ve seen two new flags in this command and one that was implied, all of which I will detail below:</p><ul><li><strong>-L</strong>: Lists the rulechain for a table.</li><li><strong>-n</strong>: Specifies that we will list only numeric values as oppose to attempting to resolve host names.</li><li><strong>-t</strong>: Used to specify the table we would like to reference. By default, this references the filter table.</li></ul><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables t filter -nL
+Chain INPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+</code></pre></div><p>The filter table, by default, has 3 predefined chains, INPUT, OUTPUT AND FORWARD. These chains are the entry-points for packets into the filter table depending on the source and destination of a packet. The INPUT chain receives packets that are destined for the localhost. It is here that you will do your common filtering for your services, such as blocking external traffic to ssh or whitelisting HTTP traffic to the world. The OUTPUT chain will be the default entrypoint for any packet that is sourced from the localhost. It is here that an administrator could block outbound connections to VPNs or ratelimit external requests, to give a few example. The FORWARD chain is used for controlling where packets can be routed. This could include adding filters to traffic that is to be NAT&rsquo;d to hosts behind your firewall or even locally to virtual machines or containers.</p><h4 id=targets>Targets:</h4><p>You will also notice that each built-in chain has a policy associated with it. In the case of each of our chains, the default policy is to ACCEPT. The policy of a chain allows an administrator to specify the target that a packet will default to, should a packet not match any rules that direct it to a target.</p><pre><code>Chain INPUT (policy ACCEPT)
+</code></pre><p>A target allows an administrator to specify the end destination of a packet and functions as a tranistion point both between chains within a table as well as an exit point from the filter table for a packet. There are many <a href=http://www.iptables.info/en/iptables-targets-and-jumps.html>built-in targets</a> and I encourage you to read up on these targets as you become more familiar with iptables, however for the purpose of this article, we will be primarily focusing on the ACCEPT, DROP and REJECT targets. I will provide a brief description of what each of these targets signify below:</p><ul><li><strong>ACCEPT</strong>: Signifies that the packet will be accepted and passed on from the filter table. No further processing or evaluation for that packet will occur within the filter table.</li><li><strong>DROP</strong>: Signifies that the packet will be dropped and no futher processing of it will take place.</li><li><strong>REJECT</strong>: Functions similarly to DROP, however an ICMP error message will be returned to the host that has sent the rejected packet.</li></ul><p>By understanding these targets and policies, we can see that our filter table is accepting any packet that is coming to or from our server. It is worth noting that changing these policies without having the correct rules in place can lead to an administrator firewalling themselves out of a host as these policies set the default behavior of the entire chain. We will explore how we can customize our firewalls with more fine grained rules in the next section.</p><h3 id=iptables-rules>IPTables Rules:</h3><p>In this next section we are going to work on adding rules to whitelist necessary services. We will then explore ways that we can limit traffic to other services that we do not explicitly allow. To accomplish this we will execute the following commands to define this rule in the INPUT chain and chang the policy.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -A INPUT -p tcp --dport <span style=color:#ae81ff>22</span> -j ACCEPT
+root@node1:~# iptables -P INPUT DROP
+</code></pre></div><p>Let&rsquo;s explore what these commands mean one by one. The first command:</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -A INPUT -p tcp --dport <span style=color:#ae81ff>22</span> -j ACCEPT
+</code></pre></div><p>The <code>-A INPUT</code> flag and argument specifies that we want append the rule to the INPUT chain. <code>-p tcp</code> specifies the protocol that we are defining this rule for, in this case tcp, and <code>--dport 22</code> specifies that we will be whitelisting this for the destination port 22. Finally, we specify a jump to a target with <code>-j ACCEPT</code>. This jump tells iptables to accept the packet, passing it on for further processessing, and to stop evaluating rules in the filter table for that packet.</p><p>We then need to change the policy to default DROP.</p><pre><code>root@node1:~# iptables -P INPUT DROP
+</code></pre><p>This command changes the default policy for the INPUT chain to DROP. This target will be applied to any incoming packet that does not already reach a terminating target from previous rules. In the case of our firewall, any packet that does not have a destination port of 22 will fall through our first rule in the INPUT chain and be dropped.</p><p>We can view our rules by running the our command from earlier. This will allow us to see that our policy has changed and that we now have a new rule under the INPUT chain.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy DROP<span style=color:#f92672>)</span>
+target     prot opt source               destination         
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination         
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination  
+</code></pre></div><p>We are still able to SSH into this host for now, however changing our INPUT policy has had an unexpected side effect. We are no longer able to receive inbound packets from other established connections. We can view this issue by attempting to make an outbound ping to google&rsquo;s public DNS.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# ping 8.8.8.8 -c <span style=color:#ae81ff>1</span>
+PING 8.8.8.8 <span style=color:#f92672>(</span>8.8.8.8<span style=color:#f92672>)</span> 56<span style=color:#f92672>(</span>84<span style=color:#f92672>)</span> bytes of data
+
+--- 8.8.8.8 ping statistics ---
+<span style=color:#ae81ff>1</span> packets transmitted, <span style=color:#ae81ff>0</span> received, 100% packet loss, time 0ms 
+</code></pre></div><p>To resolve this issue, we will make use of IPTables connection state tracking.</p><h4 id=connection-state-tracking>Connection State Tracking:</h4><p>IPTables is considered a stateful firewall due to its ability to perform connection tracking. This provides a ton of power and flexibility as packets can be associated with a running connection, allowing matches of previous packets to persist state to later packets. We will use this exact feature to fix the ping problem from before.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -I INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+</code></pre></div><p>IPTables supports loadable extension modules for additional matching features. To perform state tracking in a rule, we will need to load the conntrack module, this can be done with the <code>-m conntrack</code> flag and argument. We need to allow connections that have already been established as well as related connections for our ICMP error messages. This can be specified by allowing packets from connections associated with the <code>RELATED</code> and <code>ESTABLISHED</code> states in iptables state machines. This can be accomplished by adding the <code>--ctstate RELATED,ESTABLISHED</code> flag after our module load. Finally, We will jump to the ACCEPT target to stop all further evaluations.</p><p>This rule will satisfy many packets as often a server will have long running tcp connections. Since IPTables evaluates rules sequentially, it&rsquo;s more important to have this rule added to the top of the chain to limit rules that will need to be evaluated. For this, we&rsquo;ve used the <code>-I</code> flag to insert the rule to the top of the chain, in place of appending it to the end of the chain. We can view the newly modified chain with our connection tracking rule using the list flag we learned earlier.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy DROP<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+</code></pre></div><p>Though this firewall is easy to read now, as the ruleset grows this can quickly become complex and unreadable. Being able to break rules up into smaller logical grouping allows the ruleset to grow while still being easily readable. In the next section we will restructure our firewall to use user-defined chains and begin setting up the structure of our service-based firewall.</p><h3 id=user-defined-chains>User-defined Chains:</h3><p>Defining our own chains aside from the INPUT, FORWARD and OUTPUT chain will allow us to create logical whitelists based on services and break up our rules into smaller, easily understandable sequences. We will begin by defining an inbound chain for SSH.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -N SSH_IN
+root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy DROP<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>             
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain SSH_IN <span style=color:#f92672>(</span><span style=color:#ae81ff>0</span> references<span style=color:#f92672>)</span>
+target     prot opt source               destination
+</code></pre></div><p>The <code>-N</code> flag takes a single argument for a new chain. However, this new chain has zero references so far. We will move our rule accepting packets for port 22 to this chain. However let&rsquo;s narrow down the rules a little bit to only allow access between our desktop and node1 as well as allow access from node2. We will begin by adding two rules</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -A SSH_IN -s 10.0.2.0/24 -j ACCEPT
+root@node1:~# iptables -A SSH_IN -s 10.0.0.11/32 -j ACCEPT
+</code></pre></div><p>Finally we will need to update the INPUT chain to forward inbound tcp packets destined for port 22 to the <code>SSH_IN</code> chain. Then remove the old record.</p><pre><code>root@node1:~# iptables -A INPUT -p tcp --dport 22 -j SSH_IN
+root@node1:~# iptables -D INPUT 2
+</code></pre><p>In the first rule, much like our original rule for port 22, we&rsquo;ve adjusted the jump target from <code>ACCEPT</code> to instead jump to our newly defined target, the <code>SSH_IN</code> chain. In the second rule we&rsquo;ve encountered a new flag. <code>-D</code> specifies that we want to delete a rule. In this case we are specifying that we would like to delete the second rule from the INPUT chain. A list command will show our new rules are in place.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy DROP<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+SSH_IN     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain SSH_IN <span style=color:#f92672>(</span><span style=color:#ae81ff>1</span> references<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  10.0.2.0/24          0.0.0.0/0
+ACCEPT     all  --  10.0.0.11            0.0.0.0/0
+</code></pre></div><p>This user-defined chain may leave a new admin with additional questions. Like, what happens if no rule matches a packet that is jumped to this target. Any packet sent to the <code>SSH_IN</code> chain that does not match any rule will be returned to it&rsquo;s calling chain, in this case <code>INPUT</code>. In the next section we will setup an additional service for whitelisting http.</p><h4 id=more-services>More Services:</h4><p>Currently we have an instance of nginx listening on port 80 of node1. Lets create a new chain for the http service. and and add a whitelist for all the private subnets on node2. That will be <code>10.0.100.0/24</code> and <code>10.0.0.0/24</code>. Currently, packets destined for port 80 on node1 will be dropped. This can be verifed by attempting to curl the nginx site from node2.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node2~# curl -sD - <span style=color:#e6db74>&#39;http://10.0.100.10&#39;</span> -o /dev/null
+root@node2~#
+</code></pre></div><p>We will need to create a new inbound chain for http on node one and begin adding the rules.</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node1:~# iptables -N HTTP_IN
+root@node1:~# iptables -A HTTP_IN -s 10.0.100.0/24 -j ACCEPT
+root@node1:~# iptables -A HTTP_IN -s 10.0.0.0/24 -j ACCEPT
+root@node1:~# iptables -A INPUT -p tcp --dport <span style=color:#ae81ff>80</span> -j HTTP_IN
+root@node1:~# iptables -nL
+Chain INPUT <span style=color:#f92672>(</span>policy DROP<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+SSH_IN     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+HTTP_IN    tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:80
+
+Chain FORWARD <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain OUTPUT <span style=color:#f92672>(</span>policy ACCEPT<span style=color:#f92672>)</span>
+target     prot opt source               destination
+
+Chain HTTP_IN <span style=color:#f92672>(</span><span style=color:#ae81ff>1</span> references<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  10.0.100.0/24        0.0.0.0/0
+ACCEPT     all  --  10.0.0.0/24          0.0.0.0/0
+
+Chain SSH_IN <span style=color:#f92672>(</span><span style=color:#ae81ff>1</span> references<span style=color:#f92672>)</span>
+target     prot opt source               destination
+ACCEPT     all  --  10.0.2.0/24          0.0.0.0/0
+ACCEPT     all  --  10.0.0.11            0.0.0.0/0
+</code></pre></div><p>We can then verify that we are able to curl the host from node2:</p><div class=highlight><pre style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>root@node2:~# curl -sD - <span style=color:#e6db74>&#39;http://10.0.100.10&#39;</span> -o /dev/null
+HTTP/1.1 <span style=color:#ae81ff>200</span> OK
+Server: nginx/1.10.3
+Date: Tue, <span style=color:#ae81ff>12</span> Sep <span style=color:#ae81ff>2017</span> 02:12:54 GMT
+Content-Type: text/html
+Content-Length: <span style=color:#ae81ff>612</span>
+Last-Modified: Mon, <span style=color:#ae81ff>11</span> Sep <span style=color:#ae81ff>2017</span> 19:06:24 GMT
+Connection: keep-alive
+ETag: <span style=color:#e6db74>&#34;59b6deb0-264&#34;</span>
+Accept-Ranges: bytes
+</code></pre></div><h3 id=next-steps>Next Steps:</h3><p>Managing firewalls on a service by service basis makes it simple to add and remove access to a service by adding or removing a rule to a chain. An administrator can extend this further by managing the outgoing rules to limit access to internal services on their network and better restrict the network accessibilty of their server to only services they define. This setup also lends itself to the use of <a href=http://ipset.netfilter.org>IP Sets</a>, a fast indexable data structure for storing large sets of IP addresses, which could significantly benefit performance for large chains.</p><p>This method also lends itself well to automation, as the structure segregates services into their own chains, allowing a recipe/role/manifest to manage a single chain rather than worrying about the positioning of a rules directly in the input chain.</p><p>Bear in mind, this is only scratching the surface of what can be done with IPTables. In the followup articles we will dig deeper into what can be accomplished with this toolchain.</p></div><h4 class=page-header>Related</h4><div class=item><h4><a href=/post/intro-to-bgp/>Intro to BGP with BIRD</a></h4><h5><a href=https://packetfire.org/author/nate-catelli>Nate Catelli</a></h5><h5>An introductory tutorial on BGP using BIRD and docker.</h5><h5>June 13, 2020</h5><a href=https://packetfire.org/tags/networking><kbd class=item-tag>networking</kbd></a></div></main><footer><p class="copyright text-muted">© All rights reserved by <a href=https://packetfire.org/>Packetfire</a></p></footer></body></html>
